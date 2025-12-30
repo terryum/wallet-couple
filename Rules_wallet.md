@@ -74,6 +74,10 @@ To maintain high performance over long conversations, you must actively manage t
   1. 해당 서비스 대시보드에서 즉시 키 재생성
   2. git history에서 민감 정보 제거 (BFG Repo-Cleaner 사용)
   3. 새 키로 `.env` 업데이트
+- **Git Push 전 보안 점검 (필수):**
+  - 로컬에서 개발 후 처음 git에 올릴 때, 기존 코드에 API 키, 시크릿, 개인정보 등 민감한 정보가 없는지 반드시 검토
+  - 민감 정보가 포함된 commit이 감지되면 즉시 사용자에게 위험성 경고
+  - 점검 항목: `.env` 파일 추적 여부, 하드코딩된 키, sample-data 내 실제 개인정보
 
 # 8. Database Management (Supabase MCP) 🔧 CRITICAL
 - **MCP 사용 필수:** Supabase SQL Editor를 수동으로 조작하지 않음. Claude가 MCP를 통해 직접 테이블 생성/수정/관리를 수행.
