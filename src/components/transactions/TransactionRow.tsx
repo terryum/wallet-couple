@@ -12,6 +12,7 @@ import type { Transaction, Category } from '@/types';
 
 /** 카테고리별 배지 색상 - Design System 적용 */
 const CATEGORY_COLORS: Record<Category, string> = {
+  // 지출 카테고리
   식료품: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
   '외식/커피': 'bg-orange-50 text-orange-700 hover:bg-orange-100',
   쇼핑: 'bg-pink-50 text-pink-700 hover:bg-pink-100',
@@ -28,6 +29,13 @@ const CATEGORY_COLORS: Record<Category, string> = {
   '경조사/선물': 'bg-rose-50 text-rose-700 hover:bg-rose-100',
   '가전/가구': 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
   기타: 'bg-slate-50 text-slate-600 hover:bg-slate-100',
+  // 소득 카테고리 (녹색 계열)
+  급여: 'bg-green-100 text-green-800 hover:bg-green-200',
+  상여: 'bg-green-50 text-green-700 hover:bg-green-100',
+  '정부/환급': 'bg-lime-50 text-lime-700 hover:bg-lime-100',
+  '강연/도서': 'bg-teal-100 text-teal-800 hover:bg-teal-200',
+  금융소득: 'bg-cyan-100 text-cyan-800 hover:bg-cyan-200',
+  기타소득: 'bg-green-50 text-green-600 hover:bg-green-100',
 };
 
 interface TransactionRowProps {

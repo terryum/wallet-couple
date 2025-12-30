@@ -19,6 +19,7 @@ import { KBParser } from './kb';
 import { ManualEntryParser } from './manual';
 import { OnnuriParser } from './onnuri';
 import { SeongnamParser } from './seongnam';
+import { WooriParser } from './woori';
 
 /** 등록된 파서 목록 (우선순위 순) */
 const parsers: Parser[] = [
@@ -29,6 +30,7 @@ const parsers: Parser[] = [
   new KBParser(),
   new OnnuriParser(),
   new SeongnamParser(),
+  new WooriParser(),       // 우리은행 (소득/지출 모두 처리)
 ];
 
 /**
@@ -288,4 +290,4 @@ export function getSupportedSources(): SourceType[] {
   return parsers.map((p) => p.sourceType);
 }
 
-export { HyundaiParser, SamsungParser, LotteParser, KBParser, ManualEntryParser, OnnuriParser, SeongnamParser };
+export { HyundaiParser, SamsungParser, LotteParser, KBParser, ManualEntryParser, OnnuriParser, SeongnamParser, WooriParser };

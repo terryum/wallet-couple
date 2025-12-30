@@ -60,6 +60,13 @@ src/
 ### 롯데카드 로더 (lotte.ts)
 - 모든 시트를 검사하여 헤더 찾음
 
+### 우리은행 로더 (woori.ts) - 소득/지출 통합
+- **입금(소득):** 맡기신금액 > 0 → transaction_type: 'income'
+- **출금(지출):** 찾으신금액 > 0 → transaction_type: 'expense'
+- **최소 금액:** 5,000원 이하 무시
+- **소득 카테고리:** 월급여→급여, 상여→상여, 환급→정부/환급, 기본→강연/도서
+- **제외 패턴:** 본인/배우자 이체, 카드 결제, 상품권 충전 등
+
 ### 공통 사항
 - 스킵 키워드로 소계/합계 행 필터링
 - 금액 0 이하인 행은 검증 후 제거
@@ -77,6 +84,7 @@ CREATE TABLE transactions (
     source_type TEXT NOT NULL,
     owner TEXT NOT NULL,
     is_deleted BOOLEAN DEFAULT FALSE,
+    transaction_type TEXT NOT NULL DEFAULT 'expense', -- 'expense' 또는 'income'
     raw_data JSONB,
     file_id UUID REFERENCES uploaded_files(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -91,9 +99,14 @@ CREATE TABLE action_history (action_type, entity_type, entity_id, description, p
 ```
 
 ## Categories
+
+### 지출 카테고리
 **AI 자동 분류 (Set A):** 식료품, 외식/커피, 쇼핑, 관리비, 통신/교통, 육아, 미용/기타, 기존할부, 이자, 양육비
 
 **사용자 수동 (Set B):** 여행, 부모님, 친구/동료, 경조사/선물, 가전/가구, 기타
+
+### 소득 카테고리
+급여, 상여, 정부/환급, 강연/도서, 금융소득, 기타소득
 
 ## Supabase Configuration
 - **Project ID:** pcxgmvjtqhvkbnmkciho

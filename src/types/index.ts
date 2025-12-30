@@ -3,8 +3,8 @@
  * Wallet Card Dashboard의 핵심 데이터 타입들을 정의합니다.
  */
 
-/** 카테고리 Set A: AI 자동 분류 대상 */
-export const CATEGORY_SET_A = [
+/** 지출 카테고리 Set A: AI 자동 분류 대상 */
+export const EXPENSE_CATEGORY_SET_A = [
   '식료품',
   '외식/커피',
   '쇼핑',
@@ -17,8 +17,8 @@ export const CATEGORY_SET_A = [
   '양육비',
 ] as const;
 
-/** 카테고리 Set B: 사용자 수동 변경 전용 */
-export const CATEGORY_SET_B = [
+/** 지출 카테고리 Set B: 사용자 수동 변경 전용 */
+export const EXPENSE_CATEGORY_SET_B = [
   '여행',
   '부모님',
   '친구/동료',
@@ -27,12 +27,34 @@ export const CATEGORY_SET_B = [
   '기타',
 ] as const;
 
-/** 모든 카테고리 */
-export const ALL_CATEGORIES = [...CATEGORY_SET_A, ...CATEGORY_SET_B] as const;
+/** 소득 카테고리 */
+export const INCOME_CATEGORIES = [
+  '급여',
+  '상여',
+  '정부/환급',
+  '강연/도서',
+  '금융소득',
+  '기타소득',
+] as const;
+
+/** 기존 호환성을 위한 alias */
+export const CATEGORY_SET_A = EXPENSE_CATEGORY_SET_A;
+export const CATEGORY_SET_B = EXPENSE_CATEGORY_SET_B;
+
+/** 모든 지출 카테고리 */
+export const ALL_EXPENSE_CATEGORIES = [...EXPENSE_CATEGORY_SET_A, ...EXPENSE_CATEGORY_SET_B] as const;
+
+/** 모든 카테고리 (지출 + 소득) */
+export const ALL_CATEGORIES = [...ALL_EXPENSE_CATEGORIES, ...INCOME_CATEGORIES] as const;
 
 export type CategoryA = (typeof CATEGORY_SET_A)[number];
 export type CategoryB = (typeof CATEGORY_SET_B)[number];
 export type Category = (typeof ALL_CATEGORIES)[number];
+export type IncomeCategory = (typeof INCOME_CATEGORIES)[number];
+export type ExpenseCategory = (typeof ALL_EXPENSE_CATEGORIES)[number];
+
+/** 거래 유형 */
+export type TransactionType = 'expense' | 'income';
 
 /** 거래 내역 소유자 (부부 구분) */
 export type Owner = 'husband' | 'wife';
@@ -46,6 +68,8 @@ export type SourceType =
   | '토스뱅크'
   | '온누리'
   | '성남사랑'
+  | '우리은행'
+  | '한국투자증권'
   | '직접입력'
   | '기타';
 
@@ -60,6 +84,7 @@ export interface Transaction {
   source_type: SourceType;
   owner: Owner;
   is_deleted: boolean;
+  transaction_type: TransactionType; // 거래 유형 (지출/소득)
   raw_data: Record<string, unknown> | null;
   created_at: string;
 }
@@ -93,6 +118,7 @@ export interface ParsedTransaction {
   amount: number;
   category: Category;
   is_installment: boolean;
+  transaction_type?: TransactionType; // 거래 유형 (기본값: expense)
 }
 
 /** 파싱 결과 */

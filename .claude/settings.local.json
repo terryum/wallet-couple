@@ -73,7 +73,13 @@
       "Bash(node scripts/debug-chak.js:*)",
       "Bash(git stash:*)",
       "Bash(cmd /c \"rmdir /s /q .git\")",
-      "Bash(cmd /c \"del nul 2>nul\")"
+      "Bash(cmd /c \"del nul 2>nul\")",
+      "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" repo view terryum/wallet-card-dashboard --json name)",
+      "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" repo delete terryum/wallet-card-dashboard --yes)",
+      "Bash(\"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" repo create wallet-couple --public --source=. --remote=origin --push)",
+      "WebFetch(domain:walletcarddashboard.vercel.app)",
+      "WebFetch(domain:wallet-terry-lynn.vercel.app)",
+      "Bash(node scripts/analyze-woori.js:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
