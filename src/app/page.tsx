@@ -11,9 +11,9 @@ import { Badge } from '@/components/ui/badge';
 import {
   TransactionList,
   FileUploader,
-  CategorySheet,
   EditModal,
   SimilarTransactionsModal,
+  SummaryCard,
   type FileUploaderRef,
 } from '@/components/transactions';
 import { SharedHeader, SharedBottomNav } from '@/components/layout';
@@ -21,7 +21,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useTransactions, useDeleteTransaction } from '@/hooks/useTransactions';
 import { formatNumber } from '@/lib/utils/format';
 import type { Transaction, Category } from '@/types';
-import { ALL_CATEGORIES } from '@/types';
+import { ALL_EXPENSE_CATEGORIES } from '@/types';
 
 /** 이전 월 계산 */
 function getPrevMonth(yearMonth: string): string {
@@ -41,7 +41,6 @@ export default function HomePage() {
 
   // 로컬 상태
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
@@ -58,34 +57,39 @@ export default function HomePage() {
   // 이전 월 계산
   const prevMonth = useMemo(() => getPrevMonth(selectedMonth), [selectedMonth]);
 
-  // 전체 데이터 조회 (카테고리 필터 없이 - 카테고리별 유무 확인용)
+  // 전체 데이터 조회 (SummaryCard용 - 소득+지출 모두 필요)
   const { data: allData } = useTransactions({
     month: selectedMonth,
     owner: selectedOwner || undefined,
     includeSummary: true,
+    transactionType: 'all', // SummaryCard는 소득+지출 모두 표시
   });
 
-  // 이전 월 데이터 조회 (지난 달 총 지출 표시용)
+  // 이전 월 데이터 조회 (SummaryCard 증감 비교용)
   const { data: prevMonthData } = useTransactions({
     month: prevMonth,
     owner: selectedOwner || undefined,
     includeSummary: true,
+    transactionType: 'all', // SummaryCard는 소득+지출 모두 표시
   });
 
-  // 선택된 카테고리 데이터 조회
+  // 선택된 카테고리 데이터 조회 (내역 탭용 - 지출만)
   const { data, isLoading } = useTransactions({
     month: selectedMonth,
     owner: selectedOwner || undefined,
     category: selectedCategory || undefined,
     includeSummary: true,
+    // transactionType: 'expense' (기본값)
   });
 
-  // 카테고리별 합계 금액 계산
+  // 카테고리별 합계 금액 계산 (지출만)
   const categoryTotals = useMemo(() => {
     const allTransactions = allData?.data || [];
+    // 지출만 필터링 (소득 카테고리 제외)
+    const expenseTransactions = allTransactions.filter((tx) => tx.transaction_type !== 'income');
     const totals = new Map<Category, number>();
 
-    allTransactions.forEach((tx) => {
+    expenseTransactions.forEach((tx) => {
       const current = totals.get(tx.category) || 0;
       totals.set(tx.category, current + tx.amount);
     });
@@ -93,12 +97,12 @@ export default function HomePage() {
     return totals;
   }, [allData]);
 
-  // 정렬된 카테고리 목록: 금액순 → 0원은 가나다순
+  // 정렬된 카테고리 목록: 금액순 → 0원은 가나다순 (지출 카테고리만)
   const sortedCategories = useMemo(() => {
     const withAmount: Category[] = [];
     const withoutAmount: Category[] = [];
 
-    ALL_CATEGORIES.forEach((category) => {
+    ALL_EXPENSE_CATEGORIES.forEach((category) => {
       const total = categoryTotals.get(category) || 0;
       if (total > 0) {
         withAmount.push(category);
@@ -137,7 +141,7 @@ export default function HomePage() {
   // 모달이 닫히고 데이터가 갱신된 후 스크롤 위치 복원
   useEffect(() => {
     // 모달이 열려있거나 저장된 스크롤 위치가 없으면 스킵
-    if (editModalOpen || categorySheetOpen || savedScrollPositionRef.current === null) {
+    if (editModalOpen || savedScrollPositionRef.current === null) {
       return;
     }
 
@@ -150,17 +154,9 @@ export default function HomePage() {
     }, 100);
 
     return () => clearTimeout(timeoutId);
-  }, [editModalOpen, categorySheetOpen, transactions]);
+  }, [editModalOpen, transactions]);
 
-  // 카테고리 클릭
-  const handleCategoryClick = (transaction: Transaction) => {
-    // 카테고리 시트 열기 전에 스크롤 위치 저장
-    savedScrollPositionRef.current = window.scrollY;
-    setSelectedTransaction(transaction);
-    setCategorySheetOpen(true);
-  };
-
-  // Long Press (편집)
+  // 행 클릭 (편집)
   const handleLongPress = (transaction: Transaction) => {
     // 편집 모달 열기 전에 스크롤 위치 저장
     savedScrollPositionRef.current = window.scrollY;
@@ -224,18 +220,6 @@ export default function HomePage() {
     }
   }, []);
 
-  // 카테고리 변경 후 비슷한 거래 찾기 (CategorySheet용)
-  const handleCategoryChanged = (
-    transaction: Transaction,
-    oldCategory: Category,
-    changedCategory: Category
-  ) => {
-    setChangedTransaction({ ...transaction, category: oldCategory });
-    setNewCategory(changedCategory);
-    setNewMerchantName(null);
-    setSimilarModalOpen(true);
-  };
-
   // 이용처 또는 카테고리 변경 후 비슷한 거래 찾기 (EditModal용)
   const handleFieldsChanged = (
     transaction: Transaction,
@@ -253,10 +237,14 @@ export default function HomePage() {
       originalTx.category = changes.category.old;
     }
 
-    setChangedTransaction(originalTx);
-    setNewMerchantName(changes.merchant?.new || null);
-    setNewCategory(changes.category?.new || null);
-    setSimilarModalOpen(true);
+    // EditModal의 history.back()이 완료된 후에 SimilarTransactionsModal 열기
+    // (history 이벤트 race condition 방지)
+    setTimeout(() => {
+      setChangedTransaction(originalTx);
+      setNewMerchantName(changes.merchant?.new || null);
+      setNewCategory(changes.category?.new || null);
+      setSimilarModalOpen(true);
+    }, 50);
   };
 
   return (
@@ -328,35 +316,28 @@ export default function HomePage() {
       </div>
 
       {/* 요약 카드 */}
-      {data?.summary && (
+      {!selectedCategory ? (
         <div className="px-5 py-3">
-          <div className="max-w-lg mx-auto bg-white rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">이번 달 총 지출</span>
-              <span className="text-xl font-bold tracking-tight text-slate-900">
-                {formatNumber(data.summary.total)}원
-              </span>
-            </div>
-            {/* 전체 선택 시: 지난 달 총 지출 */}
-            {!selectedCategory && prevMonthData?.summary && (
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-                <span className="text-sm font-medium text-[#3182F6]">지난 달 총 지출</span>
-                <span className="text-lg font-bold tracking-tight text-[#3182F6]">
-                  {formatNumber(prevMonthData.summary.total)}원
-                </span>
-              </div>
-            )}
-            {/* 선택된 카테고리 합계 */}
-            {selectedCategory && categoryTotal > 0 && (
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+          <div className="max-w-lg mx-auto">
+            <SummaryCard
+              transactions={allData?.data || []}
+              prevMonthTransactions={prevMonthData?.data || []}
+            />
+          </div>
+        </div>
+      ) : (
+        categoryTotal > 0 && (
+          <div className="px-5 py-3">
+            <div className="max-w-lg mx-auto bg-white rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-[#3182F6]">{selectedCategory}</span>
                 <span className="text-lg font-bold tracking-tight text-[#3182F6]">
                   {formatNumber(categoryTotal)}원
                 </span>
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )
       )}
 
       {/* 거래 내역 리스트 */}
@@ -365,7 +346,6 @@ export default function HomePage() {
           <TransactionList
             transactions={transactions}
             isLoading={isLoading}
-            onCategoryClick={handleCategoryClick}
             onLongPress={handleLongPress}
             onDelete={handleDelete}
             onUploadClick={handleUploadClick}
@@ -401,14 +381,6 @@ export default function HomePage() {
 
       {/* 공통 하단 네비게이션 */}
       <SharedBottomNav />
-
-      {/* 카테고리 바텀시트 */}
-      <CategorySheet
-        open={categorySheetOpen}
-        onOpenChange={setCategorySheetOpen}
-        transaction={selectedTransaction}
-        onCategoryChanged={handleCategoryChanged}
-      />
 
       {/* 편집/추가 모달 */}
       <EditModal

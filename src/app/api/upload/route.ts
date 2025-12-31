@@ -14,8 +14,8 @@ import {
   createActionHistory,
   createManualEntries,
 } from '@/lib/supabase/queries';
-import { classifyTransactions, applyMerchantNameMappings, type ClassifyInput } from '@/lib/classifier';
-import type { CreateTransactionDto, Owner, ParsedTransaction } from '@/types';
+import { classifyTransactions, classifyIncomeTransactions, applyMerchantNameMappings, type ClassifyInput } from '@/lib/classifier';
+import type { CreateTransactionDto, Owner, ParsedTransaction, Category } from '@/types';
 
 /** 업로드 응답 타입 */
 interface UploadResponse {
@@ -285,15 +285,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         // 이용처명 매핑 적용
         const mappedData = await applyMerchantNameMappings(parseResult.data);
 
-        // AI 카테고리 분류
-        const classifyInputs: ClassifyInput[] = [];
+        // AI 카테고리 분류 - 지출/소득 분리 처리
+        const expenseInputs: ClassifyInput[] = [];
+        const incomeInputs: ClassifyInput[] = [];
         const installmentIndices = new Set<number>();
 
         mappedData.forEach((item, idx) => {
           if (item.is_installment === true || item.category === '기존할부') {
             installmentIndices.add(idx);
+          } else if (item.transaction_type === 'income') {
+            // 소득 거래
+            incomeInputs.push({
+              index: idx,
+              merchant: item.merchant,
+              amount: item.amount,
+            });
           } else {
-            classifyInputs.push({
+            // 지출 거래 (기본값)
+            expenseInputs.push({
               index: idx,
               merchant: item.merchant,
               amount: item.amount,
@@ -301,14 +310,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           }
         });
 
-        let categoryMap: Map<number, ParsedTransaction['category']>;
+        // 지출/소득 각각 분류
+        let categoryMap: Map<number, Category> = new Map();
         try {
-          categoryMap = classifyInputs.length > 0
-            ? await classifyTransactions(classifyInputs)
-            : new Map();
+          // 지출 분류
+          if (expenseInputs.length > 0) {
+            const expenseResults = await classifyTransactions(expenseInputs);
+            expenseResults.forEach((cat, idx) => categoryMap.set(idx, cat));
+          }
+          // 소득 분류
+          if (incomeInputs.length > 0) {
+            const incomeResults = await classifyIncomeTransactions(incomeInputs);
+            incomeResults.forEach((cat, idx) => categoryMap.set(idx, cat));
+          }
         } catch (error) {
           console.error('AI 분류 실패, 기본 카테고리 사용:', error);
-          categoryMap = new Map();
         }
 
         // 기존할부 거래의 날짜를 해당 월의 25일로 설정하기 위한 함수
@@ -336,6 +352,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
                 : (categoryMap.get(idx) || item.category),
               source_type: parseResult.source_type,
               owner,
+              transaction_type: item.transaction_type || 'expense',
               raw_data: { original: parseResult.data[idx], row_index: idx },
               file_id: fileId,
             };

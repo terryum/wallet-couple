@@ -17,7 +17,6 @@ type SortDirection = 'asc' | 'desc';
 interface TransactionListProps {
   transactions: Transaction[];
   isLoading?: boolean;
-  onCategoryClick?: (transaction: Transaction) => void;
   onLongPress?: (transaction: Transaction) => void;
   onDelete?: (transaction: Transaction) => void;
   onUploadClick?: () => void;
@@ -103,7 +102,6 @@ function SortHeader({
 export function TransactionList({
   transactions,
   isLoading,
-  onCategoryClick,
   onLongPress,
   onDelete,
   onUploadClick,
@@ -213,7 +211,6 @@ export function TransactionList({
         <TransactionRow
           key={transaction.id}
           transaction={transaction}
-          onCategoryClick={onCategoryClick}
           onLongPress={onLongPress}
           onDelete={onDelete}
         />

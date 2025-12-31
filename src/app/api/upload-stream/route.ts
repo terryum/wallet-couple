@@ -15,8 +15,8 @@ import {
   deleteTransactionsByFileId,
   deleteUploadedFile,
 } from '@/lib/supabase/queries';
-import { classifyTransactions, applyMerchantNameMappings, type ClassifyInput } from '@/lib/classifier';
-import type { CreateTransactionDto, Owner, ParsedTransaction } from '@/types';
+import { classifyTransactions, classifyIncomeTransactions, applyMerchantNameMappings, type ClassifyInput } from '@/lib/classifier';
+import type { CreateTransactionDto, Owner, ParsedTransaction, Category } from '@/types';
 
 /** 카드사 이름 매핑 */
 const SOURCE_TYPE_NAMES: Record<string, string> = {
@@ -247,23 +247,44 @@ export async function POST(request: NextRequest): Promise<Response> {
             // 이용처명 매핑 적용
             const mappedData = await applyMerchantNameMappings(parseResult.data);
 
-            // AI 분류 준비
-            const classifyInputs: ClassifyInput[] = [];
+            // AI 분류 준비 - 지출/소득 분리
+            // 로더가 설정한 특정 카테고리는 유지하고, 기본 카테고리만 AI 분류
+            const expenseInputs: ClassifyInput[] = [];
+            const incomeInputs: ClassifyInput[] = [];
             const installmentIndices = new Set<number>();
+            const presetCategories = new Set<number>(); // 로더가 설정한 카테고리 인덱스
 
             mappedData.forEach((item, idx) => {
               if (item.is_installment === true || item.category === '기존할부') {
                 installmentIndices.add(idx);
+              } else if (item.transaction_type === 'income') {
+                // 소득 거래 - '기타소득'만 AI 분류 대상
+                if (item.category === '기타소득') {
+                  incomeInputs.push({
+                    index: idx,
+                    merchant: item.merchant,
+                    amount: item.amount,
+                  });
+                } else {
+                  // 로더가 설정한 특정 카테고리 유지
+                  presetCategories.add(idx);
+                }
               } else {
-                classifyInputs.push({
-                  index: idx,
-                  merchant: item.merchant,
-                  amount: item.amount,
-                });
+                // 지출 거래 - '기타'만 AI 분류 대상
+                if (item.category === '기타') {
+                  expenseInputs.push({
+                    index: idx,
+                    merchant: item.merchant,
+                    amount: item.amount,
+                  });
+                } else {
+                  // 로더가 설정한 특정 카테고리 유지
+                  presetCategories.add(idx);
+                }
               }
             });
 
-            const totalToClassify = classifyInputs.length;
+            const totalToClassify = expenseInputs.length + incomeInputs.length;
 
             sendEvent(controller, 'classifying_start', {
               fileIndex,
@@ -271,26 +292,53 @@ export async function POST(request: NextRequest): Promise<Response> {
               total: totalToClassify,
             });
 
-            // AI 분류 (진행 상황 콜백 포함)
-            let categoryMap: Map<number, ParsedTransaction['category']>;
+            // AI 분류 (진행 상황 콜백 포함) - 지출/소득 각각
+            let categoryMap: Map<number, Category> = new Map();
+            let classifiedCount = 0;
+
             try {
-              categoryMap = totalToClassify > 0
-                ? await classifyTransactions(
-                    classifyInputs,
-                    (current, total, phase) => {
-                      sendEvent(controller, 'classifying_progress', {
-                        fileIndex,
-                        fileName,
-                        current,
-                        total,
-                        phase,
-                      });
-                    }
-                  )
-                : new Map();
+              // 지출 분류
+              if (expenseInputs.length > 0) {
+                const expenseResults = await classifyTransactions(
+                  expenseInputs,
+                  (current, total, phase) => {
+                    classifiedCount = current;
+                    sendEvent(controller, 'classifying_progress', {
+                      fileIndex,
+                      fileName,
+                      current: classifiedCount,
+                      total: totalToClassify,
+                      phase,
+                    });
+                  }
+                );
+                // 원본 인덱스로 매핑 (expenseInputs[i].index가 mappedData의 인덱스)
+                expenseResults.forEach((cat, i) => {
+                  categoryMap.set(expenseInputs[i].index, cat);
+                });
+              }
+
+              // 소득 분류
+              if (incomeInputs.length > 0) {
+                const incomeResults = await classifyIncomeTransactions(
+                  incomeInputs,
+                  (current, total, phase) => {
+                    sendEvent(controller, 'classifying_progress', {
+                      fileIndex,
+                      fileName,
+                      current: expenseInputs.length + current,
+                      total: totalToClassify,
+                      phase,
+                    });
+                  }
+                );
+                // 원본 인덱스로 매핑 (incomeInputs[i].index가 mappedData의 인덱스)
+                incomeResults.forEach((cat, i) => {
+                  categoryMap.set(incomeInputs[i].index, cat);
+                });
+              }
             } catch (error) {
               console.error('AI 분류 실패, 기본 카테고리 사용:', error);
-              categoryMap = new Map();
             }
 
             sendEvent(controller, 'classifying_complete', {
@@ -321,6 +369,7 @@ export async function POST(request: NextRequest): Promise<Response> {
                     : (categoryMap.get(idx) || item.category),
                   source_type: parseResult.source_type,
                   owner,
+                  transaction_type: item.transaction_type || 'expense',
                   raw_data: { original: parseResult.data[idx], row_index: idx },
                   file_id: fileId,
                 };

@@ -2,12 +2,14 @@
 
 ## 1. 개요 (Overview)
 * **프로젝트명:** wallet_card_dashboard
-* **버전:** v2.0 (Phase 14 완료)
-* **작성일:** 2025-12-26 (최종 업데이트: 2025-12-30)
+* **버전:** v2.3 (Phase 17 완료)
+* **작성일:** 2025-12-26 (최종 업데이트: 2025-12-31)
 * **목적:** 파편화된 부부의 금융 결제 내역(카드, 은행, 지역화폐)을 통합하여 월별 가계 현황을 정확하게 파악하고 분석하기 위함.
 * **타겟 유저:** 가계부를 관리하는 본인 및 배우자 (2인. 2인의 원본내역이 구분 가능해야 함)
 * **플랫폼:** 모바일 웹 (Mobile Web) + PWA 지원
 * **배포 URL:** https://wallet-terry-lynn.vercel.app
+
+> **관련 문서:** [`Current_Status.md`](./Current_Status.md), [`CLAUDE.md`](./CLAUDE.md)
 
 ## 2. 제품의 핵심 가치 (Product Principles)
 1.  **데이터의 완전성 (Completeness):** 자동 연동의 누락을 방지하기 위해 사용자가 직접 명세서를 업로드하여 모든 지출 내역을 포함한다.
@@ -58,10 +60,14 @@
 * **보안:** 개인 금융 정보이므로 데이터베이스 접근 제어 및 기본적인 보안 수칙을 준수한다.
 
 ## 6. 마일스톤 및 참조 문서 (References)
-* `PRD_wallet.md` (본 문서): 전체 프로젝트의 방향성 정의
-* `PRD_wallet_back.md` : 데이터 파싱, DB 구조, 분석 로직 상세
-* `PRD_wallet_front.md` : UI 컴포넌트, 페이지 레이아웃, 인터랙션 상세
-* `PRD_wallet_dataloader.md` : 카드사별 데이터 로더 명세
+| 문서 | 설명 |
+|-----|------|
+| `PRD_wallet.md` (본 문서) | 전체 프로젝트의 방향성 정의 |
+| [`PRD_wallet_back.md`](./PRD_wallet_back.md) | 데이터 파싱, DB 구조, 분석 로직 상세 |
+| [`PRD_wallet_ux.md`](./PRD_wallet_ux.md) | 사용자 인터랙션, 모달 흐름, 제스처 정의 |
+| [`PRD_wallet_dataloader.md`](./PRD_wallet_dataloader.md) | 카드사/은행별 데이터 로더 명세 |
+| [`CATEGORIES.md`](./CATEGORIES.md) | 카테고리 정의 및 수정 가이드 |
+| [`Current_Status.md`](./Current_Status.md) | 현재 개발 진행 상황 |
 
 ## 7. 구현 현황 (Implementation Status)
 
@@ -76,6 +82,7 @@
 | 매핑 관리 | 카테고리/이용처 매핑 확인 및 수정 | ✅ |
 | 파일 관리 | 업로드 파일 목록, 다운로드, 삭제 | ✅ |
 
-### 지원 카드사/상품권
+### 지원 카드사/은행/상품권
 - **카드:** 현대카드, 롯데카드, 삼성카드, KB국민카드
+- **은행:** 우리은행 (소득/지출 통합 지원)
 - **상품권:** 온누리상품권, 성남사랑상품권(암호화 지원)

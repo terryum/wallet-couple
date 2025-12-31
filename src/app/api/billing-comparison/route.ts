@@ -43,11 +43,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const lastDay = new Date(year, monthNum, 0).getDate();
       const endDate = `${month}-${String(lastDay).padStart(2, '0')}`;
 
-      // 1. 해당 월의 거래 내역에서 카드별 이용금액 집계
+      // 1. 해당 월의 거래 내역에서 카드별 이용금액 집계 (지출만)
       const { data: transactions } = await supabase
         .from('transactions')
         .select('source_type, amount')
         .eq('is_deleted', false)
+        .eq('transaction_type', 'expense') // 지출만 집계
         .gte('transaction_date', startDate)
         .lte('transaction_date', endDate);
 

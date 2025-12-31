@@ -6,12 +6,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Trash2, Edit2, Check, X, Loader2, Tag, Store, Clock, RotateCcw, ChevronRight } from 'lucide-react';
+import { Trash2, Edit2, Check, X, Loader2, Tag, Store, Clock, RotateCcw, ChevronRight, FileUp, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CATEGORY_COLORS } from '@/components/transactions/TransactionRow';
 import { ALL_CATEGORIES, type Category } from '@/types';
-import { formatDateTime } from '@/lib/utils/format';
+import { formatDateTime, formatNumber } from '@/lib/utils/format';
+import { useQueryClient } from '@tanstack/react-query';
 
 /** 카테고리 매핑 타입 */
 interface CategoryMapping {
@@ -45,7 +46,18 @@ interface ActionHistory {
   created_at: string;
 }
 
-type TabType = 'category' | 'merchant';
+/** 업로드된 파일 타입 */
+interface UploadedFile {
+  id: string;
+  display_name: string;
+  source_type: string;
+  owner: string;
+  billing_month: string | null;
+  transaction_count: number;
+  created_at: string;
+}
+
+type TabType = 'category' | 'merchant' | 'upload';
 
 /** 매핑 상세 팝업 Props */
 interface MappingDetailPopupProps {
@@ -233,9 +245,11 @@ function MappingDetailPopup({
 }
 
 export function MappingsManagement() {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('category');
   const [categoryMappings, setCategoryMappings] = useState<CategoryMapping[]>([]);
   const [merchantMappings, setMerchantMappings] = useState<MerchantNameMapping[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -250,6 +264,9 @@ export function MappingsManagement() {
   const [selectedMapping, setSelectedMapping] = useState<CategoryMapping | MerchantNameMapping | null>(null);
   const [relatedHistory, setRelatedHistory] = useState<ActionHistory[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  // 삭제 확인 팝업 상태
+  const [confirmDeleteFile, setConfirmDeleteFile] = useState<UploadedFile | null>(null);
 
   // 매핑 조회
   const fetchMappings = useCallback(async () => {
@@ -273,9 +290,61 @@ export function MappingsManagement() {
     }
   }, []);
 
+  // 업로드된 파일 조회
+  const fetchUploadedFiles = useCallback(async () => {
+    try {
+      const res = await fetch('/api/files');
+      const data = await res.json();
+
+      if (data.success) {
+        setUploadedFiles(data.data || []);
+      }
+    } catch (err) {
+      console.error('파일 목록 조회 실패:', err);
+    }
+  }, []);
+
+  // 파일 삭제 (롤백)
+  const handleDeleteFile = async (file: UploadedFile) => {
+    try {
+      setDeletingId(file.id);
+      const res = await fetch(`/api/files/${file.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        // 확인 팝업 먼저 닫기
+        setConfirmDeleteFile(null);
+        // 파일 목록 다시 불러오기 (확실한 갱신)
+        await fetchUploadedFiles();
+        // 거래 내역 캐시 갱신
+        queryClient.invalidateQueries({ queryKey: ['transactions'] });
+        queryClient.invalidateQueries({ queryKey: ['uploaded_files'] });
+      } else {
+        console.error('파일 삭제 실패:', data.error);
+        alert(`삭제 실패: ${data.error || '알 수 없는 오류'}`);
+        setConfirmDeleteFile(null);
+      }
+    } catch (err) {
+      console.error('파일 삭제 실패:', err);
+      alert('네트워크 오류가 발생했습니다.');
+      setConfirmDeleteFile(null);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   useEffect(() => {
     fetchMappings();
   }, [fetchMappings]);
+
+  // 업로드 탭 선택 시 파일 목록 조회
+  useEffect(() => {
+    if (activeTab === 'upload') {
+      fetchUploadedFiles();
+    }
+  }, [activeTab, fetchUploadedFiles]);
 
   // 컴포넌트가 visible 될 때마다 refetch (설정 메뉴에서 열릴 때)
   useEffect(() => {
@@ -507,10 +576,59 @@ export function MappingsManagement() {
           <Store className="w-4 h-4" />
           이용처명 ({merchantMappings.length})
         </button>
+        <button
+          onClick={() => setActiveTab('upload')}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+            activeTab === 'upload'
+              ? 'bg-[#3182F6] text-white'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <FileUp className="w-4 h-4" />
+          업로드 ({uploadedFiles.length})
+        </button>
       </div>
 
-      {/* 매핑 목록 */}
-      {currentMappings.length === 0 ? (
+      {/* 탭 콘텐츠 */}
+      {activeTab === 'upload' ? (
+        /* 업로드 파일 목록 */
+        uploadedFiles.length === 0 ? (
+          <div className="py-12 text-center text-slate-400">
+            <FileUp className="w-10 h-10 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">업로드된 파일이 없습니다</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {uploadedFiles.map((file) => (
+              <div
+                key={file.id}
+                className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl"
+              >
+                <FileUp className="w-5 h-5 text-slate-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">
+                    {file.display_name}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {file.source_type} · {file.owner === 'husband' ? '남편' : '아내'} · {file.transaction_count}건 · {formatDateTime(file.created_at)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setConfirmDeleteFile(file)}
+                  disabled={deletingId === file.id}
+                  className="p-2 text-red-400 hover:text-red-600 hover:bg-red-100 rounded-lg disabled:opacity-50"
+                >
+                  {deletingId === file.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        )
+      ) : currentMappings.length === 0 ? (
         <div className="py-12 text-center text-slate-400">
           <p className="text-sm">저장된 매핑이 없습니다</p>
         </div>
@@ -680,7 +798,9 @@ export function MappingsManagement() {
       <p className="mt-4 text-xs text-slate-400 text-center">
         {activeTab === 'category'
           ? '패턴이 포함된 이용처는 자동으로 해당 카테고리로 분류됩니다'
-          : '패턴이 포함된 이용처명은 자동으로 변환됩니다'}
+          : activeTab === 'merchant'
+          ? '패턴이 포함된 이용처명은 자동으로 변환됩니다'
+          : '파일을 삭제하면 해당 파일의 모든 거래 내역이 함께 삭제됩니다'}
       </p>
 
       {/* 매핑 상세 팝업 */}
@@ -694,6 +814,58 @@ export function MappingsManagement() {
         onRestore={handleRestore}
         onDelete={() => selectedMapping && handleDelete(activeTab, selectedMapping.id)}
       />
+
+      {/* 파일 삭제 확인 팝업 */}
+      {confirmDeleteFile && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setConfirmDeleteFile(null)}>
+          <div
+            className="bg-white rounded-2xl w-[85%] max-w-sm p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">파일 삭제</h3>
+                <p className="text-xs text-slate-500">이 작업은 되돌릴 수 없습니다</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-xl mb-4">
+              <p className="text-sm font-medium text-slate-900 truncate">
+                {confirmDeleteFile.display_name}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                {confirmDeleteFile.transaction_count}건의 거래 내역이 함께 삭제됩니다
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDeleteFile(null)}
+                className="flex-1 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => handleDeleteFile(confirmDeleteFile)}
+                disabled={deletingId === confirmDeleteFile.id}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-red-500 rounded-xl hover:bg-red-600 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deletingId === confirmDeleteFile.id ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    삭제 중...
+                  </>
+                ) : (
+                  '삭제'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

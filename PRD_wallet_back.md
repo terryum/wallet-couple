@@ -27,9 +27,12 @@ Supabase에 생성할 주요 테이블 구조는 다음과 같다.
 | `amount` | Integer | 금액 | |
 | `category` | Text | 분류 | AI 또는 사용자 지정 값 |
 | `memo` | Text | 메모 | 사용자 수기 입력 (Default: null) |
-| `source_type` | Text | 출처 | 예: '현대카드', '토스뱅크', '온누리' |
+| `source_type` | Text | 출처 | 예: '현대카드', '우리은행', '온누리' |
+| `owner` | Text | 소유자 | 'husband' 또는 'wife' |
 | `is_deleted` | Boolean | 삭제 여부 | Soft Delete 구현용 (Default: false) |
+| `transaction_type` | Text | 거래 유형 | 'expense' 또는 'income' (Default: 'expense') |
 | `raw_data` | JSONB | 원본 데이터 | 디버깅용 원본 행 데이터 저장 |
+| `file_id` | UUID | 업로드 파일 ID | uploaded_files 테이블 참조 |
 | `created_at` | Timestamp | 생성일 | |
 
 ## 4. 데이터 수집 및 파싱 전략 (Data Ingestion Strategy)
@@ -66,8 +69,9 @@ Supabase에 생성할 주요 테이블 구조는 다음과 같다.
 * 육아
 * 병원/미용 (병원, 약국, 의료비, 미용실, 피부관리, 네일, 화장품)
 * 기존할부
-* 이자
+* 대출이자
 * 양육비
+* 세금 (국세, 지방세, 자동차세 등)
 
 **[Set B: 사용자 수동 변경 전용]** (AI는 이 값으로 초기 분류하지 않음, 사용자가 수정 시 선택 가능)
 * 여행
@@ -76,6 +80,14 @@ Supabase에 생성할 주요 테이블 구조는 다음과 같다.
 * 경조사/선물
 * 가전/가구
 * 기타 (AI 분류 실패 시 기본값)
+
+**[소득 카테고리]**
+* 급여
+* 상여
+* 정부/환급
+* 강연/도서
+* 금융소득
+* 기타소득
 
 ## 6. API 및 기능 명세 (API Specs)
 

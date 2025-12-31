@@ -56,13 +56,22 @@ const INCOME_CATEGORY_PATTERNS: Array<{ pattern: string; category: Category }> =
 
 /** 지출 카테고리 매핑 */
 const EXPENSE_CATEGORY_PATTERNS: Array<{ pattern: string; category: Category }> = [
-  { pattern: '토뱅엄태웅', category: '이자' },
-  { pattern: '*이자*', category: '이자' },
+  // 대출이자
+  { pattern: '토뱅엄태웅', category: '대출이자' },
+  { pattern: '*이자*', category: '대출이자' },
+  // 양육비
   { pattern: '*박찬하*', category: '양육비' },
-  { pattern: '*경찰청*', category: '통신/교통' },
-  { pattern: '*인천서구*', category: '관리비' },
-  { pattern: '*68저*', category: '관리비' },
-  { pattern: '*179호*', category: '관리비' },
+  // 세금 (국세, 지방세, 교통범칙금 등)
+  { pattern: '*경찰청*', category: '세금' },
+  { pattern: '*인천서구*', category: '세금' },
+  { pattern: '*68저*', category: '세금' },
+  { pattern: '*179호*', category: '세금' },
+  { pattern: '*국세*', category: '세금' },
+  { pattern: '*지방세*', category: '세금' },
+  { pattern: '*자동차세*', category: '세금' },
+  { pattern: '*재산세*', category: '세금' },
+  { pattern: '*주민세*', category: '세금' },
+  // 쇼핑
   { pattern: '*네이버페이충전*', category: '쇼핑' },
   { pattern: '*당근페이*', category: '쇼핑' },
 ];
@@ -136,6 +145,18 @@ function parseDate(dateStr: string): string {
   }
 
   return '';
+}
+
+/**
+ * 적요(summary)에서 이용처 이름 결정
+ * - CD 거래(ATM 인출)인 경우 "ATM 인출"로 표시
+ */
+function getMerchantName(summary: string, description: string): string {
+  // 적요에 "CD"가 포함되어 있으면 ATM 인출
+  if (summary.toUpperCase().includes('CD')) {
+    return 'ATM 인출';
+  }
+  return description || summary;
 }
 
 /**
@@ -217,6 +238,9 @@ export class WooriParser implements Parser {
       const date = parseDate(dateTime);
       if (!date) continue;
 
+      // 이용처 결정 (CD 거래 → ATM 인출)
+      const merchant = getMerchantName(summary, description);
+
       // 입금 (소득)
       if (deposit > 0 && withdrawal === 0) {
         if (deposit < MIN_AMOUNT) continue;
@@ -230,7 +254,7 @@ export class WooriParser implements Parser {
 
         transactions.push({
           date,
-          merchant: description || summary,
+          merchant,
           amount: deposit,
           category,
           is_installment: false,
@@ -252,7 +276,7 @@ export class WooriParser implements Parser {
 
         transactions.push({
           date,
-          merchant: description || summary,
+          merchant,
           amount: withdrawal,
           category,
           is_installment: false,

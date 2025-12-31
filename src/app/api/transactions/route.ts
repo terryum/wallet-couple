@@ -19,6 +19,7 @@ import type {
   CreateTransactionDto,
   Category,
   Owner,
+  TransactionType,
 } from '@/types';
 import { isValidMonth, isValidCategory } from '@/lib/utils/validation';
 import { formatNumber } from '@/lib/utils/format';
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const category = searchParams.get('category') as Category | null;
     const owner = searchParams.get('owner') as Owner | null;
     const includeSummary = searchParams.get('include_summary') === 'true';
+    const transactionType = searchParams.get('transaction_type') as TransactionType | 'all' | null;
 
     // 월 필수 검증
     if (!month) {
@@ -81,6 +83,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       sort: sort || 'date_desc',
       category: category || undefined,
       owner: owner || undefined,
+      transactionType: transactionType || undefined,
     };
 
     const result = await getTransactions(params);
@@ -93,11 +96,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // 집계 데이터 포함 여부
+    // summary는 transactionType에 따라 필터링 (기본: expense)
     let summary = null;
     if (includeSummary) {
+      // transactionType이 'all'이면 summary도 전체, 아니면 해당 타입만
+      const summaryType = transactionType === 'all' ? 'all' : (transactionType || 'expense');
       const [totalResult, aggregationResult] = await Promise.all([
-        getMonthlyTotal(month, owner || undefined),
-        getMonthlyAggregation(month, owner || undefined),
+        getMonthlyTotal(month, owner || undefined, summaryType as 'expense' | 'income' | 'all'),
+        getMonthlyAggregation(month, owner || undefined, summaryType as 'expense' | 'income' | 'all'),
       ]);
 
       summary = {

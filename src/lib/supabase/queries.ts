@@ -23,12 +23,13 @@ export interface QueryResult<T> {
 
 /**
  * 거래 내역 조회 (월별)
+ * @param params.transactionType - 'expense' | 'income' | 'all' (기본: 'expense')
  */
 export async function getTransactions(
   params: TransactionQueryParams
 ): Promise<QueryResult<Transaction[]>> {
   try {
-    const { month, sort = 'date_desc', category, owner } = params;
+    const { month, sort = 'date_desc', category, owner, transactionType = 'expense' } = params;
 
     // 월의 시작일과 종료일 계산
     const startDate = `${month}-01`;
@@ -43,6 +44,11 @@ export async function getTransactions(
       .eq('is_deleted', false)
       .gte('transaction_date', startDate)
       .lte('transaction_date', endDate);
+
+    // 트랜잭션 타입 필터 (기본: 지출만)
+    if (transactionType !== 'all') {
+      query = query.eq('transaction_type', transactionType);
+    }
 
     // 필터 적용
     if (category) {
@@ -194,10 +200,12 @@ export async function deleteTransaction(
 
 /**
  * 월별 카테고리별 집계
+ * @param transactionType - 'expense' | 'income' | 'all' (기본: 'expense' - 지출만)
  */
 export async function getMonthlyAggregation(
   month: string,
-  owner?: Owner
+  owner?: Owner,
+  transactionType: 'expense' | 'income' | 'all' = 'expense'
 ): Promise<
   QueryResult<{ category: Category; total: number; count: number }[]>
 > {
@@ -214,6 +222,11 @@ export async function getMonthlyAggregation(
       .eq('is_deleted', false)
       .gte('transaction_date', startDate)
       .lte('transaction_date', endDate);
+
+    // 트랜잭션 타입 필터 (기본: 지출만)
+    if (transactionType !== 'all') {
+      query = query.eq('transaction_type', transactionType);
+    }
 
     if (owner) {
       query = query.eq('owner', owner);
@@ -255,11 +268,13 @@ export async function getMonthlyAggregation(
 }
 
 /**
- * 월별 총 지출액 조회
+ * 월별 총액 조회
+ * @param transactionType - 'expense' | 'income' | 'all' (기본: 'expense' - 지출만)
  */
 export async function getMonthlyTotal(
   month: string,
-  owner?: Owner
+  owner?: Owner,
+  transactionType: 'expense' | 'income' | 'all' = 'expense'
 ): Promise<QueryResult<number>> {
   try {
     const startDate = `${month}-01`;
@@ -274,6 +289,11 @@ export async function getMonthlyTotal(
       .eq('is_deleted', false)
       .gte('transaction_date', startDate)
       .lte('transaction_date', endDate);
+
+    // 트랜잭션 타입 필터 (기본: 지출만)
+    if (transactionType !== 'all') {
+      query = query.eq('transaction_type', transactionType);
+    }
 
     if (owner) {
       query = query.eq('owner', owner);

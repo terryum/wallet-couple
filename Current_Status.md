@@ -1,11 +1,13 @@
 # Current Status - Wallet Card Dashboard
 
-**최종 업데이트:** 2025-12-30 (Phase 14 완료)
+**최종 업데이트:** 2025-12-31 (Phase 17 완료)
+
+> **관련 문서:** [`PRD_wallet.md`](./PRD_wallet.md) (상위), [`CATEGORIES.md`](./CATEGORIES.md), [`PRD_wallet_ux.md`](./PRD_wallet_ux.md)
 
 ---
 
 ## 1. Current Goal (현재 목표)
-Phase 14 UI/UX 개선 완료 - 차트 인터랙션 개선, 설정 메뉴 기능 추가
+Phase 17 완료 - 대시보드 소득/지출 분리 (차트에서 지출만 분석)
 
 ---
 
@@ -127,6 +129,54 @@ Phase 14 UI/UX 개선 완료 - 차트 인터랙션 개선, 설정 메뉴 기능 
 - [x] SettingsDropdown 패턴 매핑 관리 기능 추가
 - [x] iOS/Desktop 설치 가이드 다이얼로그
 
+### Phase 15: 카테고리 확장 및 모달 개선 ✅
+- [x] 세금 카테고리 추가 (국세, 지방세, 자동차세, 재산세, 주민세)
+- [x] "이자" → "대출이자" 카테고리명 변경
+- [x] 우리은행 로더 소득/지출 통합 지원
+  - 입금(맡기신금액) → 소득, 출금(찾으신금액) → 지출
+  - 5,000원 이하 소액 거래 자동 무시
+  - 본인/배우자 이체, 카드결제, 상품권 충전 자동 제외
+  - CD 거래 → "ATM 인출"로 자동 변환
+- [x] UploadResultPopup 중첩 모달 네비게이션 수정
+  - 자식 모달 열릴 때 부모 팝업 닫히는 버그 수정
+  - useModalBackHandler에 disabled 옵션 추가
+- [x] EditModal 소득/지출 카테고리 분리 (transaction_type 기반)
+- [x] CategorySheet 카테고리 뱃지 클릭 기능 추가
+- [x] SummaryCard "원" 정렬 개선 (tabular-nums, 고정 너비)
+- [x] MappingsManagement 파일 삭제 후 UI 새로고침 수정
+
+### Phase 16: UX 단순화 및 데이터 동기화 ✅
+- [x] CategorySheet 제거 (UX 단순화)
+  - 모든 항목 클릭 시 EditModal로 직접 이동
+  - 카테고리 뱃지 별도 클릭 제거
+- [x] SummaryCard 소득 데이터 표시 수정
+  - `transactionType` API 파라미터 추가 (`useTransactions.ts`, `route.ts`)
+  - `transactionType: 'all'` 옵션으로 소득+지출 모두 조회
+- [x] UploadResultPopup 데이터 동기화 개선
+  - SwipeableRow 삭제 시 Optimistic Update 적용 (즉시 UI 반영)
+  - EditModal 닫힐 때 `fetchTransactions()` 재호출로 데이터 동기화
+  - 삭제/수정 후 업로드 내역 리스트 자동 갱신
+- [x] SimilarTransactionsModal history race condition 수정
+  - EditModal 닫힘 후 50ms 딜레이로 모달 순차 열기
+
+### Phase 17: 대시보드 소득/지출 분리 ✅
+- [x] 대시보드 차트에서 지출만 분석하도록 수정
+  - 문제: 우리은행 데이터로 소득이 차트에 혼입되는 버그
+  - 해결: 집계 함수에 `transactionType` 필터 추가
+- [x] `queries.ts` 수정
+  - `getMonthlyAggregation()`: `transactionType` 파라미터 추가 (기본: 'expense')
+  - `getMonthlyTotal()`: `transactionType` 파라미터 추가 (기본: 'expense')
+- [x] `/api/transactions/route.ts` 수정
+  - summary 데이터 조회 시 `transactionType` 전달
+- [x] `useDashboard.ts` 수정
+  - API 호출 시 `transaction_type=expense` 파라미터 추가
+- [x] `/api/billing-comparison/route.ts` 수정
+  - `.eq('transaction_type', 'expense')` 필터 추가
+- [x] 데이터 분리 검증
+  - 2025-12 지출: 2,147,000원
+  - 2025-12 소득: 10,468,500원
+  - 2025-12 전체: 12,615,500원 (정확히 일치)
+
 **총 테스트: 78개 통과**
 
 ---
@@ -158,11 +208,11 @@ wallet_card_dashboard/
 │   │   │   ├── TransactionList.tsx
 │   │   │   ├── TransactionRow.tsx
 │   │   │   ├── FileUploader.tsx
-│   │   │   ├── CategorySheet.tsx
 │   │   │   ├── EditModal.tsx
 │   │   │   ├── SimilarTransactionsModal.tsx
 │   │   │   ├── UploadResultPopup.tsx
 │   │   │   ├── SwipeableRow.tsx      # iOS 스타일 삭제
+│   │   │   ├── SummaryCard.tsx       # 소득/지출 요약
 │   │   │   └── PasswordDialog.tsx
 │   │   ├── settings/
 │   │   │   ├── SettingsDropdown.tsx  # 설정 드롭다운 (메인)
@@ -182,13 +232,14 @@ wallet_card_dashboard/
 │   │   └── useCategoryCalculation.ts # 카테고리 계산 공유 훅
 │   ├── lib/
 │   │   ├── classifier/             # AI 카테고리 분류
-│   │   ├── loaders/                # 카드사 파서
+│   │   ├── loaders/                # 카드사/은행 파서
 │   │   │   ├── hyundai.ts
 │   │   │   ├── lotte.ts
 │   │   │   ├── samsung.ts
 │   │   │   ├── kb.ts
 │   │   │   ├── onnuri.ts
 │   │   │   ├── seongnam.ts
+│   │   │   ├── woori.ts            # 우리은행 (소득+지출)
 │   │   │   └── manual.ts
 │   │   ├── supabase/
 │   │   └── utils/
@@ -206,7 +257,9 @@ wallet_card_dashboard/
 
 ## 4. 카테고리 목록
 
-### Set A: AI 자동 분류
+> 상세 내용: [`CATEGORIES.md`](./CATEGORIES.md)
+
+### Set A: AI 자동 분류 (11개)
 | 카테고리 | 설명 |
 |---------|------|
 | 식료품 | 마트, 슈퍼, 편의점 |
@@ -217,11 +270,15 @@ wallet_card_dashboard/
 | 육아 | 어린이집, 학원, 아이용품 |
 | 병원/미용 | 병원, 약국, 미용실, 화장품 |
 | 기존할부 | 할부 결제 |
-| 이자 | 대출/카드 이자 |
+| 대출이자 | 대출/카드 이자, 금융비용 |
 | 양육비 | 양육비 이체 |
+| 세금 | 국세, 지방세, 자동차세, 재산세 |
 
-### Set B: 사용자 수동 변경
-- 여행, 부모님, 친구/동료, 경조사/선물, 가전/가구, 기타
+### Set B: 사용자 수동 변경 (6개)
+여행, 부모님, 친구/동료, 경조사/선물, 가전/가구, 기타
+
+### 소득 카테고리 (6개)
+급여, 상여, 정부/환급, 강연/도서, 금융소득, 기타소득
 
 ---
 
@@ -269,14 +326,15 @@ npx tsc --noEmit
 
 ### 거래 내역 편집
 - 탭하여 상세 편집 (EditModal)
-- 카테고리 바로 변경 (CategorySheet)
-- iOS 스타일 삭제 제스처
-- 비슷한 거래 일괄 수정
+- iOS 스타일 삭제 제스처 (스와이프, 롱프레스)
+- 비슷한 거래 일괄 수정 (이용처/카테고리 변경 시)
 
 ### 업로드 결과 팝업
 - 업로드 완료 후 해당 파일 내역만 표시
+- 2단계 팝업 지원 (우리은행 등: 지출 → 소득)
 - 변경 히스토리에서도 접근 가능
 - EditModal과 동일한 편집 경험
+- 삭제/수정 후 실시간 리스트 동기화
 
 ### PWA (Progressive Web App)
 - 홈 화면에 앱으로 설치 가능
@@ -295,4 +353,4 @@ npx tsc --noEmit
 
 ---
 
-*마지막 업데이트: 2025-12-30 - UI/UX 개선, 설정 메뉴 기능 추가, 차트 인터랙션 개선*
+*마지막 업데이트: 2025-12-31 - 대시보드 소득/지출 분리 (차트에서 지출만 분석)*

@@ -13,8 +13,9 @@ export const EXPENSE_CATEGORY_SET_A = [
   '육아',
   '병원/미용',
   '기존할부',
-  '이자',
+  '대출이자',
   '양육비',
+  '세금',
 ] as const;
 
 /** 지출 카테고리 Set B: 사용자 수동 변경 전용 */
@@ -98,6 +99,7 @@ export interface CreateTransactionDto {
   memo?: string;
   source_type: SourceType;
   owner: Owner;
+  transaction_type?: TransactionType;
   raw_data?: Record<string, unknown>;
 }
 
@@ -145,6 +147,8 @@ export interface TransactionQueryParams {
   sort?: 'date_asc' | 'date_desc' | 'amount_asc' | 'amount_desc';
   category?: Category;
   owner?: Owner;
+  /** 거래 유형 필터: 'expense' | 'income' | 'all' (기본: 'expense') */
+  transactionType?: TransactionType | 'all';
 }
 
 /** 대시보드 집계 데이터 */

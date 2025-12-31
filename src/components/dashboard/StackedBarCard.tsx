@@ -335,8 +335,8 @@ export function StackedBarCard({
     }
 
     // 전체 표시 시 스택 순서 지정 (배열 순서 = 아래에서 위로)
-    // 맨 아래: 양육비 → 이자 → 관리비 → 기존할부 → 나머지 → etc.
-    const fixedOrder = ['양육비', '이자', '관리비', '기존할부'];
+    // 맨 아래: 양육비 → 대출이자 → 관리비 → 기존할부 → 나머지 → etc.
+    const fixedOrder = ['양육비', '대출이자', '관리비', '기존할부'];
     const orderedCategories: string[] = [];
 
     // 1. 고정 순서 카테고리 먼저 추가 (있는 것만)

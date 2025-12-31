@@ -44,6 +44,7 @@ async function fetchTransactions(
   if (params.category) searchParams.set('category', params.category);
   if (params.owner) searchParams.set('owner', params.owner);
   if (params.includeSummary) searchParams.set('include_summary', 'true');
+  if (params.transactionType) searchParams.set('transaction_type', params.transactionType);
 
   const res = await fetch(`/api/transactions?${searchParams.toString()}`);
   if (!res.ok) {

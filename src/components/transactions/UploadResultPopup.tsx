@@ -23,14 +23,21 @@ import { SwipeableRow } from './SwipeableRow';
 import { CATEGORY_COLORS } from './TransactionRow';
 import { useDeleteTransaction } from '@/hooks/useTransactions';
 import { useModalBackHandler } from '@/hooks/useModalBackHandler';
-import type { Category, Transaction } from '@/types';
+import type { Category, Transaction, TransactionType } from '@/types';
 import { useQueryClient } from '@tanstack/react-query';
+
+/** 2단계 팝업을 지원하는 소스 타입 (소득+지출 동시 처리) */
+const DUAL_PHASE_SOURCES = ['우리은행', '한국투자증권'];
+
+/** 현재 팝업 단계 */
+type PopupPhase = 'expense' | 'income' | 'done';
 
 interface UploadResultPopupProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   fileId: string | null;
   displayName?: string;
+  sourceType?: string;
 }
 
 export function UploadResultPopup({
@@ -38,18 +45,15 @@ export function UploadResultPopup({
   onOpenChange,
   fileId,
   displayName,
+  sourceType,
 }: UploadResultPopupProps) {
-  // 뒤로가기 버튼 처리
-  const handleClose = useCallback(() => onOpenChange(false), [onOpenChange]);
-  useModalBackHandler({
-    isOpen: open,
-    onClose: handleClose,
-    modalId: 'upload-result-popup',
-  });
-
   const queryClient = useQueryClient();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // 2단계 팝업 관련 상태
+  const [phase, setPhase] = useState<PopupPhase>('expense');
+  const isDualPhase = DUAL_PHASE_SOURCES.includes(sourceType || '');
 
   // 삭제 뮤테이션
   const { mutate: deleteTransaction } = useDeleteTransaction();
@@ -64,30 +68,72 @@ export function UploadResultPopup({
   const [newCategory, setNewCategory] = useState<Category | null>(null);
   const [newMerchantName, setNewMerchantName] = useState<string | null>(null);
 
-  // 파일 ID로 거래 내역 조회
+  // 자식 모달이 열려있는지 체크 (열려있으면 뒤로가기로 닫지 않음)
+  const isChildModalOpen = editModalOpen || similarModalOpen;
+
+  // 뒤로가기 버튼 처리 - 자식 모달이 없을 때만 닫기
+  const handleClose = useCallback(() => {
+    onOpenChange(false);
+  }, [onOpenChange]);
+
+  // 부모 팝업의 history state는 유지하되, 자식 모달이 열려있으면 back 핸들러만 비활성화
+  // phase가 바뀌면 새로운 modalId를 사용하여 history state를 갱신
+  useModalBackHandler({
+    isOpen: open,
+    onClose: handleClose,
+    modalId: `upload-result-popup-${phase}`, // phase별 다른 modalId
+    disabled: isChildModalOpen, // 자식 모달이 열려있으면 back 핸들링 비활성화
+  });
+
+  // 지출/소득 분리
+  const expenseTransactions = allTransactions.filter(
+    (t) => t.transaction_type !== 'income'
+  );
+  const incomeTransactions = allTransactions.filter(
+    (t) => t.transaction_type === 'income'
+  );
+
+  // 현재 단계에서 보여줄 거래 목록
+  const transactions = phase === 'income' ? incomeTransactions : expenseTransactions;
+
+  // 현재 단계 제목
+  const phaseTitle = isDualPhase
+    ? phase === 'income'
+      ? '업로드 내역 (소득)'
+      : '업로드 내역 (지출)'
+    : displayName || '업로드 내역';
+
+  // 파일 ID로 거래 내역 조회 (재사용 가능한 함수)
+  const fetchTransactions = useCallback(async (resetPhase = true) => {
+    if (!fileId) return;
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/transactions/by-file/${fileId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAllTransactions(data.data || []);
+        if (resetPhase) {
+          setPhase('expense'); // 새로 열릴 때 지출 단계부터 시작
+        }
+      }
+    } catch (error) {
+      console.error('거래 내역 조회 실패:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fileId]);
+
+  // 팝업 열릴 때 데이터 조회
   useEffect(() => {
     if (!open || !fileId) {
-      setTransactions([]);
+      setAllTransactions([]);
+      setPhase('expense'); // 팝업 닫힐 때 단계 초기화
       return;
     }
 
-    const fetchTransactions = async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch(`/api/transactions/by-file/${fileId}`);
-        if (response.ok) {
-          const data = await response.json();
-          setTransactions(data.data || []);
-        }
-      } catch (error) {
-        console.error('거래 내역 조회 실패:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTransactions();
-  }, [open, fileId]);
+    fetchTransactions(true);
+  }, [open, fileId, fetchTransactions]);
 
   // 거래 항목 클릭 시 EditModal 열기
   const handleTransactionClick = (transaction: Transaction) => {
@@ -95,12 +141,14 @@ export function UploadResultPopup({
     setEditModalOpen(true);
   };
 
-  // 거래 삭제
+  // 거래 삭제 (Optimistic Update)
   const handleDelete = (transaction: Transaction) => {
+    // 먼저 로컬 상태에서 즉시 제거 (Optimistic Update)
+    setAllTransactions((prev) => prev.filter((t) => t.id !== transaction.id));
+
+    // 그 다음 API 호출
     deleteTransaction(transaction.id, {
       onSuccess: () => {
-        // 로컬 상태에서 제거
-        setTransactions((prev) => prev.filter((t) => t.id !== transaction.id));
         queryClient.invalidateQueries({ queryKey: ['transactions'] });
       },
     });
@@ -115,7 +163,7 @@ export function UploadResultPopup({
     }
   ) => {
     // 로컬 상태 업데이트
-    setTransactions((prev) =>
+    setAllTransactions((prev) =>
       prev.map((t) => {
         if (t.id !== transaction.id) return t;
         const updated = { ...t };
@@ -134,17 +182,23 @@ export function UploadResultPopup({
       originalTx.category = changes.category.old;
     }
 
-    setChangedTransaction(originalTx);
-    setNewMerchantName(changes.merchant?.new || null);
-    setNewCategory(changes.category?.new || null);
-    setSimilarModalOpen(true);
+    // EditModal의 history.back()이 완료된 후에 SimilarTransactionsModal 열기
+    // (history 이벤트 race condition 방지)
+    setTimeout(() => {
+      setChangedTransaction(originalTx);
+      setNewMerchantName(changes.merchant?.new || null);
+      setNewCategory(changes.category?.new || null);
+      setSimilarModalOpen(true);
+    }, 50);
   };
 
   // EditModal 닫힐 때 데이터 갱신
   const handleEditModalClose = (isOpen: boolean) => {
     setEditModalOpen(isOpen);
     if (!isOpen) {
-      // 데이터 새로고침
+      // 로컬 상태 새로고침 (삭제/수정 반영, phase 유지)
+      fetchTransactions(false);
+      // React Query 캐시도 무효화
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
     }
   };
@@ -157,12 +211,15 @@ export function UploadResultPopup({
         <DialogContent className="w-[calc(100%-2rem)] max-w-lg mx-auto rounded-2xl max-h-[85vh] !flex !flex-col overflow-hidden p-0">
           <DialogHeader className="shrink-0 p-6 pb-2">
             <DialogTitle className="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-2">
-              <FileSpreadsheet className="w-5 h-5 text-green-600" />
-              {displayName || '업로드 내역'}
+              <FileSpreadsheet className={`w-5 h-5 ${phase === 'income' ? 'text-blue-600' : 'text-green-600'}`} />
+              {phaseTitle}
             </DialogTitle>
             {!isLoading && transactions.length > 0 && (
               <p className="text-sm text-slate-500">
                 {transactions.length}건 · 총 {formatNumber(totalAmount)}원
+                {isDualPhase && phase === 'expense' && incomeTransactions.length > 0 && (
+                  <span className="ml-2 text-blue-500">(소득 {incomeTransactions.length}건 대기)</span>
+                )}
               </p>
             )}
           </DialogHeader>
@@ -229,10 +286,25 @@ export function UploadResultPopup({
           {/* 하단 버튼 */}
           <div className="shrink-0 p-6 pt-2 border-t border-slate-100">
             <button
-              onClick={() => onOpenChange(false)}
-              className="w-full py-2.5 text-sm font-medium text-white bg-[#3182F6] rounded-xl hover:bg-[#1B64DA] transition-colors"
+              onClick={() => {
+                // 2단계 팝업 로직
+                if (isDualPhase && phase === 'expense' && incomeTransactions.length > 0) {
+                  // 지출 단계 완료 → 소득 단계로
+                  setPhase('income');
+                } else {
+                  // 소득 단계 완료 또는 단일 단계 → 닫기
+                  onOpenChange(false);
+                }
+              }}
+              className={`w-full py-2.5 text-sm font-medium text-white rounded-xl transition-colors ${
+                phase === 'income'
+                  ? 'bg-blue-500 hover:bg-blue-600'
+                  : 'bg-[#3182F6] hover:bg-[#1B64DA]'
+              }`}
             >
-              확인
+              {isDualPhase && phase === 'expense' && incomeTransactions.length > 0
+                ? '다음 (소득 내역)'
+                : '확인'}
             </button>
           </div>
         </DialogContent>

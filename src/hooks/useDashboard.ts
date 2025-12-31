@@ -40,7 +40,7 @@ interface MultiMonthData {
   byCategory: CategoryAggregation[];
 }
 
-/** 월별 집계 데이터 조회 */
+/** 월별 집계 데이터 조회 (대시보드용 - 지출만) */
 async function fetchMonthlyAggregation(
   month: string,
   owner?: Owner
@@ -48,6 +48,7 @@ async function fetchMonthlyAggregation(
   const params = new URLSearchParams();
   params.set('month', month);
   params.set('include_summary', 'true');
+  params.set('transaction_type', 'expense'); // 대시보드는 지출만 분석
   if (owner) params.set('owner', owner);
 
   const res = await fetch(`/api/transactions?${params.toString()}`);

@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ALL_CATEGORIES, type Category, type Transaction, type Owner } from '@/types';
+import { ALL_EXPENSE_CATEGORIES, INCOME_CATEGORIES, type Category, type Transaction, type Owner } from '@/types';
 import { CATEGORY_COLORS } from './TransactionRow';
 import {
   useUpdateTransaction,
@@ -265,9 +265,12 @@ export function EditModal({
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
               카테고리
+              {transaction?.transaction_type === 'income' && (
+                <span className="ml-2 text-xs text-blue-500 font-normal">(소득)</span>
+              )}
             </label>
             <div className="flex flex-wrap gap-1.5">
-              {ALL_CATEGORIES.map((category) => {
+              {(transaction?.transaction_type === 'income' ? INCOME_CATEGORIES : ALL_EXPENSE_CATEGORIES).map((category) => {
                 const colorClass =
                   CATEGORY_COLORS[category] || CATEGORY_COLORS['기타'];
                 const isSelected = formData.category === category;

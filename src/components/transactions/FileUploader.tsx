@@ -93,20 +93,33 @@ function getSavedPasswordForFile(fileName: string): string | null {
   return passwords[pattern] || null;
 }
 
-/** 파일명에서 카드사 추출 (분석 중 표시용, 월 정보는 서버에서 결정) */
-function getCardType(fileName: string): string {
+/** 파일명에서 소스 타입 추출 (분석 중 표시용) */
+function getSourceDisplayName(fileName: string): string {
   const name = fileName.toLowerCase();
 
+  // 카드사
   if (name.includes('hyundai') || name.includes('현대')) {
-    return '현대카드';
+    return '현대카드 명세서';
   } else if (name.includes('samsung') || name.includes('삼성')) {
-    return '삼성카드';
+    return '삼성카드 명세서';
   } else if (name.includes('lotte') || name.includes('롯데') || name.includes('이용대금명세서')) {
-    return '롯데카드';
+    return '롯데카드 명세서';
   } else if (name.includes('kb') || name.includes('국민') || name.includes('usage')) {
-    return 'KB국민카드';
-  } else {
-    return '명세서';
+    return 'KB국민카드 명세서';
+  }
+  // 은행
+  else if (name.includes('거래내역') || name.includes('woori') || name.includes('우리')) {
+    return '우리은행 거래내역';
+  }
+  // 상품권/지역화폐
+  else if (name.includes('온누리') || name.includes('onnuri')) {
+    return '온누리상품권';
+  } else if (name.includes('성남') || name.includes('seongnam') || name.includes('결제내역') || name.includes('chak') || name.includes('차크') || name.includes('이용내역')) {
+    return '성남사랑상품권';
+  }
+  // 기본값
+  else {
+    return '파일';
   }
 }
 
@@ -120,10 +133,18 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
   const abortControllerRef = useRef<AbortController | null>(null);
   const createdFileIdsRef = useRef<string[]>([]);
 
+  // 마지막 업로드 정보 (stale closure 방지용)
+  const lastUploadInfoRef = useRef<{
+    fileId?: string;
+    displayName?: string;
+    sourceType?: string;
+  }>({});
+
   // 업로드 결과 팝업 상태
   const [showResultPopup, setShowResultPopup] = useState(false);
   const [resultFileId, setResultFileId] = useState<string | null>(null);
   const [resultDisplayName, setResultDisplayName] = useState<string>('');
+  const [resultSourceType, setResultSourceType] = useState<string>('');
 
   /** 업로드 취소 및 롤백 */
   const handleCancel = async () => {
@@ -275,6 +296,14 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
                   }
                   inserted = data.inserted || 0;
                   duplicates = data.duplicates || 0;
+                  // ref에 최신 업로드 정보 저장 (첫 번째 성공 파일 기준)
+                  if (!lastUploadInfoRef.current.fileId && data.fileId) {
+                    lastUploadInfoRef.current = {
+                      fileId: data.fileId,
+                      displayName: data.displayName,
+                      sourceType: data.sourceType,
+                    };
+                  }
                   setFileProgresses((prev) =>
                     prev.map((p, idx) =>
                       idx === fileIndex
@@ -335,7 +364,7 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
     // 초기 상태 설정 (카드사만 표시, 월 정보는 서버 응답 후)
     const initialProgresses: FileProgress[] = fileArray.map((file) => ({
       name: file.name,
-      displayName: getCardType(file.name),
+      displayName: getSourceDisplayName(file.name),
       status: 'pending',
     }));
 
@@ -346,6 +375,7 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
     // AbortController 생성
     abortControllerRef.current = new AbortController();
     createdFileIdsRef.current = [];
+    lastUploadInfoRef.current = {};
 
     let totalInserted = 0;
     let totalDuplicates = 0;
@@ -474,22 +504,23 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
     );
     setShowResult(true);
 
-    // 성공 시 업로드 결과 팝업 표시 준비
-    const uploadedFileId = createdFileIdsRef.current[0];
-    const uploadedDisplayName = fileProgresses.find(fp => fp.result?.fileId === uploadedFileId)?.displayName;
+    // 성공 시 업로드 결과 팝업 표시 준비 - ref를 사용하여 최신 상태 참조
+    const uploadInfo = lastUploadInfoRef.current;
 
     setTimeout(() => {
       setShowResult(false);
       setFileProgresses([]);
 
       // 성공적으로 업로드된 파일이 있으면 팝업 표시
-      if (totalInserted > 0 && uploadedFileId) {
-        setResultFileId(uploadedFileId);
-        setResultDisplayName(uploadedDisplayName || '업로드 내역');
+      if (totalInserted > 0 && uploadInfo.fileId) {
+        setResultFileId(uploadInfo.fileId);
+        setResultDisplayName(uploadInfo.displayName || '업로드 내역');
+        setResultSourceType(uploadInfo.sourceType || '');
         setShowResultPopup(true);
       }
 
       createdFileIdsRef.current = [];
+      lastUploadInfoRef.current = {};
     }, 2000);
 
     onSuccess?.();
@@ -844,6 +875,7 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
         onOpenChange={setShowResultPopup}
         fileId={resultFileId}
         displayName={resultDisplayName}
+        sourceType={resultSourceType}
       />
     </>
   );

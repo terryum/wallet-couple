@@ -6,7 +6,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '@/lib/supabase/client';
-import { CATEGORY_SET_A, type Category, type CategoryA } from '@/types';
+import { CATEGORY_SET_A, INCOME_CATEGORIES, type Category, type CategoryA, type IncomeCategory } from '@/types';
 
 /** 분류 대상 거래 */
 export interface ClassifyInput {
@@ -33,7 +33,7 @@ interface CategoryMapping {
 /** 배치 크기 (한 번에 분류할 거래 수) */
 const BATCH_SIZE = 50;
 
-/** 카테고리 설명 */
+/** 지출 카테고리 설명 */
 const CATEGORY_DESCRIPTIONS: Record<CategoryA, string> = {
   '식료품': '마트, 슈퍼, 편의점에서 구매한 식재료, 생필품',
   '외식/커피': '음식점, 카페, 배달음식, 커피, 음료',
@@ -43,8 +43,19 @@ const CATEGORY_DESCRIPTIONS: Record<CategoryA, string> = {
   '육아': '어린이집, 유치원, 학원, 아이용품, 장난감, 아이 병원비',
   '병원/미용': '병원, 약국, 의료비, 미용실, 피부관리, 네일, 화장품',
   '기존할부': '할부 결제 (자동차, 가전제품 등)',
-  '이자': '대출이자, 카드이자, 금융비용',
+  '대출이자': '대출이자, 카드이자, 금융비용, 토스뱅크 이자',
   '양육비': '양육비 이체, 양육 관련 고정 지출',
+  '세금': '국세, 지방세, 자동차세, 재산세, 주민세, 경찰청, 교통범칙금',
+};
+
+/** 소득 카테고리 설명 */
+const INCOME_CATEGORY_DESCRIPTIONS: Record<IncomeCategory, string> = {
+  '급여': '월급, 정기 급여, 회사에서 받는 급여',
+  '상여': '보너스, 인센티브, 추석/명절 상여금',
+  '정부/환급': '정부 지원금, 세금 환급, 연말정산 환급, 육아수당',
+  '강연/도서': '강연료, 원고료, 인세, 컨설팅비, 부업 수입',
+  '금융소득': '이자, 배당금, 투자 수익, 예금 이자',
+  '기타소득': '중고 판매, 경품, 기타 수입',
 };
 
 /**
@@ -432,6 +443,145 @@ export async function classifySingle(
     { index: 0, merchant, amount },
   ]);
   return results.get(0) || '기타';
+}
+
+/**
+ * 소득 카테고리 시스템 프롬프트 생성
+ */
+function getIncomeSystemPrompt(): string {
+  const categoryList = Object.entries(INCOME_CATEGORY_DESCRIPTIONS)
+    .map(([cat, desc]) => `- ${cat}: ${desc}`)
+    .join('\n');
+
+  return `당신은 한국 가계부 소득 카테고리 분류 전문가입니다.
+주어진 입금 내역(이체자명, 적요)과 금액을 분석하여 적절한 소득 카테고리로 분류해주세요.
+
+사용 가능한 소득 카테고리:
+${categoryList}
+
+규칙:
+1. 입금 내역에서 키워드를 분석하여 가장 적합한 카테고리를 선택합니다.
+2. "월급여", "급여" 키워드가 포함되면 "급여"로 분류합니다.
+3. "상여", "보너스", "인센티브" 키워드가 포함되면 "상여"로 분류합니다.
+4. "환급", "정부", "수당" 키워드가 포함되면 "정부/환급"으로 분류합니다.
+5. 회사명이나 기관명이 보이고 금액이 크면 "강연/도서" (부업 수입)으로 분류합니다.
+6. "이자", "배당" 키워드가 포함되면 "금융소득"으로 분류합니다.
+7. 확실하지 않은 경우 '기타소득'으로 분류합니다.
+8. 응답은 반드시 JSON 배열 형식으로만 해주세요.
+9. 각 항목은 {index: number, category: string} 형식입니다.
+
+예시 응답:
+[{"index":0,"category":"급여"},{"index":1,"category":"강연/도서"}]`;
+}
+
+/**
+ * 소득 배치 분류 요청 (AI)
+ */
+async function classifyIncomeBatchWithAI(
+  client: Anthropic,
+  items: ClassifyInput[]
+): Promise<ClassifyResult[]> {
+  const itemsText = items
+    .map((item) => `${item.index}. "${item.merchant}" (${item.amount.toLocaleString()}원)`)
+    .join('\n');
+
+  const message = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1024,
+    messages: [
+      {
+        role: 'user',
+        content: `다음 입금 내역들을 소득 카테고리로 분류해주세요:\n\n${itemsText}`,
+      },
+    ],
+    system: getIncomeSystemPrompt(),
+  });
+
+  const content = message.content[0];
+  if (content.type !== 'text') {
+    throw new Error('예상치 못한 응답 형식');
+  }
+
+  const jsonMatch = content.text.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) {
+    console.error('JSON 파싱 실패:', content.text);
+    return items.map((item) => ({
+      index: item.index,
+      category: '기타소득' as Category,
+    }));
+  }
+
+  try {
+    const parsed = JSON.parse(jsonMatch[0]) as { index: number; category: string }[];
+
+    return parsed.map((item) => ({
+      index: item.index,
+      category: INCOME_CATEGORIES.includes(item.category as IncomeCategory)
+        ? (item.category as Category)
+        : ('기타소득' as Category),
+    }));
+  } catch (e) {
+    console.error('JSON 파싱 오류:', e);
+    return items.map((item) => ({
+      index: item.index,
+      category: '기타소득' as Category,
+    }));
+  }
+}
+
+/**
+ * 소득 거래 내역 일괄 분류
+ * 소득 카테고리 전용 AI 분류
+ *
+ * @param items 분류할 소득 거래 목록
+ * @param onProgress 진행 상황 콜백 (선택적)
+ * @param signal AbortSignal (취소용, 선택적)
+ * @returns 인덱스별 카테고리 맵
+ */
+export async function classifyIncomeTransactions(
+  items: ClassifyInput[],
+  onProgress?: ProgressCallback,
+  signal?: AbortSignal
+): Promise<Map<number, Category>> {
+  if (items.length === 0) {
+    return new Map();
+  }
+
+  const results = new Map<number, Category>();
+  const client = createClient();
+  let processedCount = 0;
+  const totalCount = items.length;
+
+  // 배치로 나누어 처리
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    if (signal?.aborted) {
+      throw new Error('Classification aborted');
+    }
+
+    const batch = items.slice(i, i + BATCH_SIZE);
+
+    try {
+      const batchResults = await classifyIncomeBatchWithAI(client, batch);
+
+      batchResults.forEach((result) => {
+        results.set(result.index, result.category);
+        processedCount++;
+        onProgress?.(processedCount, totalCount, 'ai');
+      });
+    } catch (error) {
+      if (signal?.aborted) {
+        throw new Error('Classification aborted');
+      }
+      console.error(`소득 배치 ${i / BATCH_SIZE + 1} 분류 실패:`, error);
+      batch.forEach((item) => {
+        results.set(item.index, '기타소득');
+        processedCount++;
+        onProgress?.(processedCount, totalCount, 'ai');
+      });
+    }
+  }
+
+  return results;
 }
 
 /**

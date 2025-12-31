@@ -21,8 +21,9 @@ const CATEGORY_COLORS: Record<Category, string> = {
   육아: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
   '병원/미용': 'bg-violet-50 text-violet-700 hover:bg-violet-100',
   기존할부: 'bg-rose-50 text-rose-700 hover:bg-rose-100',
-  이자: 'bg-red-50 text-red-700 hover:bg-red-100',
+  대출이자: 'bg-red-50 text-red-700 hover:bg-red-100',
   양육비: 'bg-teal-50 text-teal-700 hover:bg-teal-100',
+  세금: 'bg-purple-50 text-purple-700 hover:bg-purple-100',
   여행: 'bg-cyan-50 text-cyan-700 hover:bg-cyan-100',
   부모님: 'bg-amber-50 text-amber-700 hover:bg-amber-100',
   '친구/동료': 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100',
@@ -40,14 +41,12 @@ const CATEGORY_COLORS: Record<Category, string> = {
 
 interface TransactionRowProps {
   transaction: Transaction;
-  onCategoryClick?: (transaction: Transaction) => void;
   onLongPress?: (transaction: Transaction) => void;
   onDelete?: (transaction: Transaction) => void;
 }
 
 export function TransactionRow({
   transaction,
-  onCategoryClick,
   onLongPress,
   onDelete,
 }: TransactionRowProps) {
@@ -109,14 +108,10 @@ export function TransactionRow({
         {transaction.merchant_name}
       </span>
 
-      {/* 카테고리 뱃지 - 타이트하게 */}
+      {/* 카테고리 뱃지 */}
       <Badge
         variant="secondary"
-        className={`shrink-0 cursor-pointer text-[10px] px-1.5 py-0.5 rounded-md font-medium transition-all ${categoryColor}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          onCategoryClick?.(transaction);
-        }}
+        className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-md font-medium ${categoryColor}`}
       >
         {transaction.category}
       </Badge>
