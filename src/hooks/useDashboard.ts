@@ -7,6 +7,7 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Category, Owner } from '@/types';
+import { mapSummaryToAggregation } from '@/lib/dashboard/transform';
 
 /** 이전/다음 월 계산 */
 function getAdjacentMonth(yearMonth: string, delta: number): string {
@@ -58,23 +59,13 @@ async function fetchMonthlyAggregation(
 
   const json = await res.json();
 
-  // API 응답의 total을 total_amount로 매핑
-  const byCategory = (json.summary?.byCategory || []).map(
-    (item: { category: Category; total: number; count: number }) => ({
-      category: item.category,
-      total_amount: item.total,
-      count: item.count,
-    })
-  );
-
-  // 총 건수 계산
-  const totalCount = byCategory.reduce((sum: number, item: CategoryAggregation) => sum + item.count, 0);
+  const { byCategory, totalCount, total } = mapSummaryToAggregation(json.summary);
 
   return {
     success: json.success,
     data: byCategory,
     month,
-    total: json.summary?.total || 0,
+    total,
     totalCount,
     error: json.error,
   };

@@ -5,13 +5,14 @@
 
 'use client';
 
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { PieChartCard, StackedBarCard, BillingComparisonCard } from '@/components/dashboard';
 import { SharedHeader, SharedBottomNav } from '@/components/layout';
 import { FileUploader, EditModal, type FileUploaderRef } from '@/components/transactions';
 import { useAppContext } from '@/contexts/AppContext';
+import { useTransactionEditFlow } from '@/hooks/useTransactionEditFlow';
 import {
   useMonthlyAggregation,
   useMultiMonthAggregation,
@@ -25,8 +26,11 @@ export default function DashboardPage() {
   // 전역 상태
   const { selectedMonth, selectedOwner, currentUser } = useAppContext();
 
-  // 로컬 상태
-  const [editModalOpen, setEditModalOpen] = useState(false);
+  const editFlow = useTransactionEditFlow({
+    owner: currentUser,
+    enableSimilarModal: false,
+    modalIdBase: 'dashboard',
+  });
 
   // 양쪽 차트 동기화용 하이라이트 카테고리
   const [highlightedCategory, setHighlightedCategory] = useState<string | null>(null);
@@ -102,7 +106,7 @@ export default function DashboardPage() {
           <span className="text-sm font-medium">파일</span>
         </button>
         <button
-          onClick={() => setEditModalOpen(true)}
+          onClick={() => editFlow.openEdit(null)}
           className="flex items-center gap-2 px-4 py-3 bg-[#3182F6] text-white rounded-2xl shadow-lg hover:bg-[#1B64DA] active:scale-95 transition-all"
         >
           <Plus className="w-5 h-5" />
@@ -118,10 +122,7 @@ export default function DashboardPage() {
 
       {/* 편집/추가 모달 */}
       <EditModal
-        open={editModalOpen}
-        onOpenChange={setEditModalOpen}
-        transaction={null}
-        owner={currentUser}
+        {...editFlow.editModalProps}
       />
     </div>
   );

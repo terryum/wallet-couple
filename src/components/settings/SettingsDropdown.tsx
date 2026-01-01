@@ -5,19 +5,21 @@
 
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRightLeft, FolderOpen, RotateCcw, History, Smartphone, Download, Check, Tags, Share } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { FileManagement } from './FileManagement';
 import { MappingsManagement } from './MappingsManagement';
 import { HistoryModal } from './HistoryModal';
 import { ResetConfirmDialog } from './ResetConfirmDialog';
 import { useAppContext } from '@/contexts/AppContext';
+import { useModalBackHandler } from '@/hooks/useModalBackHandler';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import type { Owner } from '@/types';
 
@@ -137,6 +139,70 @@ export function SettingsDropdown({ onUploadClick }: SettingsDropdownProps) {
       onUploadClick?.();
     }, 100);
   };
+
+  const handleFileManagementClose = useCallback(() => {
+    setFileManagementOpen(false);
+  }, []);
+
+  const handleMappingsManagementClose = useCallback(() => {
+    setMappingsManagementOpen(false);
+  }, []);
+
+  const handleIosGuideClose = useCallback(() => {
+    setIosGuideOpen(false);
+  }, []);
+
+  const handleDesktopGuideClose = useCallback(() => {
+    setDesktopGuideOpen(false);
+  }, []);
+
+  useModalBackHandler({
+    isOpen: fileManagementOpen,
+    onClose: handleFileManagementClose,
+    modalId: 'settings-dropdown-file-management',
+    disabled:
+      mappingsManagementOpen ||
+      resetDialogOpen ||
+      historyModalOpen ||
+      iosGuideOpen ||
+      desktopGuideOpen,
+  });
+
+  useModalBackHandler({
+    isOpen: mappingsManagementOpen,
+    onClose: handleMappingsManagementClose,
+    modalId: 'settings-dropdown-mappings-management',
+    disabled:
+      fileManagementOpen ||
+      resetDialogOpen ||
+      historyModalOpen ||
+      iosGuideOpen ||
+      desktopGuideOpen,
+  });
+
+  useModalBackHandler({
+    isOpen: iosGuideOpen,
+    onClose: handleIosGuideClose,
+    modalId: 'settings-dropdown-ios-guide',
+    disabled:
+      fileManagementOpen ||
+      mappingsManagementOpen ||
+      resetDialogOpen ||
+      historyModalOpen ||
+      desktopGuideOpen,
+  });
+
+  useModalBackHandler({
+    isOpen: desktopGuideOpen,
+    onClose: handleDesktopGuideClose,
+    modalId: 'settings-dropdown-desktop-guide',
+    disabled:
+      fileManagementOpen ||
+      mappingsManagementOpen ||
+      resetDialogOpen ||
+      historyModalOpen ||
+      iosGuideOpen,
+  });
 
   // 현재 사용자 및 전환 대상 아이콘/텍스트
   const CurrentIcon = currentUser === 'husband' ? MaleIcon : FemaleIcon;
@@ -279,6 +345,9 @@ export function SettingsDropdown({ onUploadClick }: SettingsDropdownProps) {
             <DialogTitle className="text-lg font-bold tracking-tight text-slate-900">
               업로드 파일 관리
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              업로드한 파일 목록을 확인하고 삭제할 수 있습니다.
+            </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto -mx-6 px-6">
             <FileManagement onUploadClick={handleUploadFromFileManagement} />
@@ -293,6 +362,9 @@ export function SettingsDropdown({ onUploadClick }: SettingsDropdownProps) {
             <DialogTitle className="text-lg font-bold tracking-tight text-slate-900">
               패턴 매핑 관리
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              자동 분류 규칙을 확인하고 수정합니다.
+            </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto -mx-6 px-6">
             <MappingsManagement />
@@ -308,6 +380,9 @@ export function SettingsDropdown({ onUploadClick }: SettingsDropdownProps) {
               <Smartphone className="w-5 h-5 text-[#3182F6]" />
               앱 설치 방법
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              iOS에서 홈 화면에 앱을 추가하는 방법을 안내합니다.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-slate-600">
@@ -358,6 +433,9 @@ export function SettingsDropdown({ onUploadClick }: SettingsDropdownProps) {
               <Smartphone className="w-5 h-5 text-[#3182F6]" />
               앱 설치 방법
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              데스크톱 또는 안드로이드에서 설치하는 방법을 안내합니다.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-slate-600">

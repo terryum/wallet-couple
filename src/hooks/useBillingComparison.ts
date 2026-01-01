@@ -5,19 +5,12 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-
-export interface CardBilling {
-  source_type: string;
-  usage_amount: number;
-  billing_amount: number;
-}
-
-export interface MonthlyBilling {
-  month: string;
-  usage_amount: number;
-  billing_amount: number;
-  cards: CardBilling[];
-}
+import {
+  buildBillingComparisonRows,
+  type BillingComparisonRow,
+  type CardBilling,
+  type MonthlyBilling,
+} from '@/lib/dashboard/billingComparison';
 
 interface BillingComparisonResponse {
   success: boolean;
@@ -42,5 +35,8 @@ export function useBillingComparison(months: number = 12) {
     queryKey: ['billing-comparison', months],
     queryFn: () => fetchBillingComparison(months),
     staleTime: 1000 * 60 * 5, // 5분
+    select: buildBillingComparisonRows,
   });
 }
+
+export type { BillingComparisonRow, CardBilling, MonthlyBilling };

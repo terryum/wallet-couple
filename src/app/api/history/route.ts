@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getActionHistory } from '@/lib/supabase/queries';
+import { getActionHistory } from '@/lib/repositories/action-history.repo';
 
 /**
  * GET /api/history

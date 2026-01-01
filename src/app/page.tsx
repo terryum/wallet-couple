@@ -19,6 +19,7 @@ import {
 import { SharedHeader, SharedBottomNav } from '@/components/layout';
 import { useAppContext } from '@/contexts/AppContext';
 import { useTransactions, useDeleteTransaction } from '@/hooks/useTransactions';
+import { useTransactionEditFlow } from '@/hooks/useTransactionEditFlow';
 import { formatNumber } from '@/lib/utils/format';
 import type { Transaction, Category } from '@/types';
 import { ALL_EXPENSE_CATEGORIES } from '@/types';
@@ -41,14 +42,11 @@ export default function HomePage() {
 
   // 로컬 상태
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-
-  // 비슷한 거래 모달 상태
-  const [similarModalOpen, setSimilarModalOpen] = useState(false);
-  const [changedTransaction, setChangedTransaction] = useState<Transaction | null>(null);
-  const [newCategory, setNewCategory] = useState<Category | null>(null);
-  const [newMerchantName, setNewMerchantName] = useState<string | null>(null);
+  const editFlow = useTransactionEditFlow({
+    owner: currentUser,
+    openSimilarDelayMs: 50,
+    modalIdBase: 'home',
+  });
 
   // 드래그 앤 드롭 상태
   const [isDragging, setIsDragging] = useState(false);
@@ -141,7 +139,7 @@ export default function HomePage() {
   // 모달이 닫히고 데이터가 갱신된 후 스크롤 위치 복원
   useEffect(() => {
     // 모달이 열려있거나 저장된 스크롤 위치가 없으면 스킵
-    if (editModalOpen || savedScrollPositionRef.current === null) {
+    if (editFlow.editModalOpen || savedScrollPositionRef.current === null) {
       return;
     }
 
@@ -154,14 +152,13 @@ export default function HomePage() {
     }, 100);
 
     return () => clearTimeout(timeoutId);
-  }, [editModalOpen, transactions]);
+  }, [editFlow.editModalOpen, transactions]);
 
   // 행 클릭 (편집)
   const handleLongPress = (transaction: Transaction) => {
     // 편집 모달 열기 전에 스크롤 위치 저장
     savedScrollPositionRef.current = window.scrollY;
-    setSelectedTransaction(transaction);
-    setEditModalOpen(true);
+    editFlow.openEdit(transaction);
   };
 
   // 삭제
@@ -219,33 +216,6 @@ export default function HomePage() {
       }
     }
   }, []);
-
-  // 이용처 또는 카테고리 변경 후 비슷한 거래 찾기 (EditModal용)
-  const handleFieldsChanged = (
-    transaction: Transaction,
-    changes: {
-      merchant?: { old: string; new: string };
-      category?: { old: Category; new: Category };
-    }
-  ) => {
-    // 원래 값으로 transaction 복원
-    const originalTx = { ...transaction };
-    if (changes.merchant) {
-      originalTx.merchant_name = changes.merchant.old;
-    }
-    if (changes.category) {
-      originalTx.category = changes.category.old;
-    }
-
-    // EditModal의 history.back()이 완료된 후에 SimilarTransactionsModal 열기
-    // (history 이벤트 race condition 방지)
-    setTimeout(() => {
-      setChangedTransaction(originalTx);
-      setNewMerchantName(changes.merchant?.new || null);
-      setNewCategory(changes.category?.new || null);
-      setSimilarModalOpen(true);
-    }, 50);
-  };
 
   return (
     <div
@@ -366,8 +336,7 @@ export default function HomePage() {
         </button>
         <button
           onClick={() => {
-            setSelectedTransaction(null);
-            setEditModalOpen(true);
+            editFlow.openEdit(null);
           }}
           className="flex items-center gap-2 px-4 py-3 bg-[#3182F6] text-white rounded-2xl shadow-lg hover:bg-[#1B64DA] active:scale-95 transition-all"
         >
@@ -384,21 +353,13 @@ export default function HomePage() {
 
       {/* 편집/추가 모달 */}
       <EditModal
-        open={editModalOpen}
-        onOpenChange={setEditModalOpen}
-        transaction={selectedTransaction}
-        owner={currentUser}
-        onFieldsChanged={handleFieldsChanged}
+        {...editFlow.editModalProps}
       />
 
       {/* 비슷한 거래 일괄 수정 모달 */}
-      <SimilarTransactionsModal
-        open={similarModalOpen}
-        onOpenChange={setSimilarModalOpen}
-        originalTransaction={changedTransaction}
-        newCategory={newCategory}
-        newMerchantName={newMerchantName}
-      />
+      {editFlow.similarModalProps && (
+        <SimilarTransactionsModal {...editFlow.similarModalProps} />
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { deleteUploadedFile } from '@/lib/supabase/queries';
+import { removeUploadedFile } from '@/lib/services/files.service';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -27,7 +27,7 @@ export async function DELETE(
       );
     }
 
-    const result = await deleteUploadedFile(id);
+    const result = await removeUploadedFile(id);
 
     if (result.error) {
       return NextResponse.json(

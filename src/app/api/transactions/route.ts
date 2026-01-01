@@ -6,13 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  getTransactions,
-  createTransactions,
-  getMonthlyTotal,
-  getMonthlyAggregation,
-  createActionHistory,
-} from '@/lib/supabase/queries';
+import { createActionHistory } from '@/lib/repositories/action-history.repo';
 import { supabase } from '@/lib/supabase/client';
 import type {
   TransactionQueryParams,
@@ -21,6 +15,7 @@ import type {
   Owner,
   TransactionType,
 } from '@/types';
+import { fetchTransactionsWithSummary } from '@/lib/services/transactions.service';
 import { isValidMonth, isValidCategory } from '@/lib/utils/validation';
 import { formatNumber } from '@/lib/utils/format';
 
@@ -86,7 +81,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       transactionType: transactionType || undefined,
     };
 
-    const result = await getTransactions(params);
+    const result = await fetchTransactionsWithSummary(params, includeSummary);
 
     if (result.error) {
       return NextResponse.json(
@@ -95,29 +90,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // 집계 데이터 포함 여부
-    // summary는 transactionType에 따라 필터링 (기본: expense)
-    let summary = null;
-    if (includeSummary) {
-      // transactionType이 'all'이면 summary도 전체, 아니면 해당 타입만
-      const summaryType = transactionType === 'all' ? 'all' : (transactionType || 'expense');
-      const [totalResult, aggregationResult] = await Promise.all([
-        getMonthlyTotal(month, owner || undefined, summaryType as 'expense' | 'income' | 'all'),
-        getMonthlyAggregation(month, owner || undefined, summaryType as 'expense' | 'income' | 'all'),
-      ]);
-
-      summary = {
-        total: totalResult.data || 0,
-        byCategory: aggregationResult.data || [],
-      };
-    }
-
     return NextResponse.json({
       success: true,
       data: result.data,
       count: result.data?.length || 0,
       month,
-      summary,
+      summary: result.summary,
     });
   } catch (err) {
     return NextResponse.json(

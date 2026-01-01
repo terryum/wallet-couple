@@ -6,10 +6,18 @@
 
 'use client';
 
-import { useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback, useId } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { formatNumber, formatYearMonth, formatShortDate } from '@/lib/utils/format';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useTransactionEditFlow } from '@/hooks/useTransactionEditFlow';
 import { useModalBackHandler } from '@/hooks/useModalBackHandler';
 import { EditModal } from '@/components/transactions/EditModal';
 import { SimilarTransactionsModal } from '@/components/transactions/SimilarTransactionsModal';
@@ -35,26 +43,18 @@ export function CategoryPopup({
 }: CategoryPopupProps) {
   const queryClient = useQueryClient();
 
-  // 뒤로가기 버튼 처리
-  const handleClose = useCallback(() => onClose(), [onClose]);
-  useModalBackHandler({
-    isOpen,
-    onClose: handleClose,
-    modalId: 'category-popup',
+  const editFlow = useTransactionEditFlow({
+    onEditClose: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+    modalIdBase: 'category-popup',
   });
-
-  // EditModal 상태
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-
-  // SimilarTransactionsModal 상태
-  const [similarModalOpen, setSimilarModalOpen] = useState(false);
-  const [changedTransaction, setChangedTransaction] = useState<Transaction | null>(null);
-  const [newCategory, setNewCategory] = useState<Category | null>(null);
-  const [newMerchantName, setNewMerchantName] = useState<string | null>(null);
 
   const isAll = category === '전체';
   const isEtc = category === 'etc.' && etcCategories.length > 0;
+  const titleId = useId();
+  const descriptionId = useId();
 
   // 거래 내역 조회
   // - '전체': 해당 월 전체 조회
@@ -89,81 +89,60 @@ export function CategoryPopup({
   }, [totalAmount, sortedTransactions]);
 
   // 거래 항목 클릭 - EditModal 열기
-  const handleTransactionClick = useCallback((tx: Transaction) => {
-    setSelectedTransaction(tx);
-    setEditModalOpen(true);
-  }, []);
-
-  // 이용처 또는 카테고리 변경 후 비슷한 거래 찾기
-  const handleFieldsChanged = useCallback((
-    transaction: Transaction,
-    changes: {
-      merchant?: { old: string; new: string };
-      category?: { old: Category; new: Category };
-    }
-  ) => {
-    // 원래 값으로 transaction 복원
-    const originalTx = { ...transaction };
-    if (changes.merchant) {
-      originalTx.merchant_name = changes.merchant.old;
-    }
-    if (changes.category) {
-      originalTx.category = changes.category.old;
-    }
-
-    setChangedTransaction(originalTx);
-    setNewMerchantName(changes.merchant?.new || null);
-    setNewCategory(changes.category?.new || null);
-    setSimilarModalOpen(true);
-  }, []);
-
-  // EditModal 닫힐 때 데이터 갱신
-  const handleEditModalClose = useCallback((open: boolean) => {
-    setEditModalOpen(open);
-    if (!open) {
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    }
-  }, [queryClient]);
+  const handleTransactionClick = useCallback(
+    (tx: Transaction) => {
+      editFlow.openEdit(tx);
+    },
+    [editFlow]
+  );
 
   if (!isOpen || !category) return null;
 
   const displayName = category;
 
   // EditModal 또는 SimilarTransactionsModal이 열려있으면 overlay 클릭 비활성화
-  const isSubModalOpen = editModalOpen || similarModalOpen;
+  const isSubModalOpen = editFlow.isSubModalOpen;
+
+  // 뒤로가기 버튼 처리
+  const handleClose = useCallback(() => onClose(), [onClose]);
+  useModalBackHandler({
+    isOpen,
+    onClose: handleClose,
+    modalId: 'category-popup',
+    disabled: isSubModalOpen,
+  });
+
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen && !isSubModalOpen) {
+        onClose();
+      }
+    },
+    [isSubModalOpen, onClose]
+  );
 
   return (
-    <div
-      className={`fixed inset-0 bg-black/50 flex items-center justify-center z-40 ${isSubModalOpen ? 'pointer-events-none' : ''}`}
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-2xl w-[90%] max-w-md max-h-[70vh] overflow-hidden shadow-xl relative"
-        onClick={(e) => e.stopPropagation()}
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent
+        className="w-[90%] max-w-md max-h-[70vh] overflow-hidden p-0"
+        showCloseButton={!isSubModalOpen}
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
       >
-        {/* 닫기 버튼 */}
-        <button
-          onClick={onClose}
-          className="absolute top-2 right-2 p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 z-10"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-
-        {/* 헤더 */}
-        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-100">
+        <DialogHeader className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <h3 className="text-base font-bold text-slate-900 truncate">
+            <DialogTitle id={titleId} className="text-base font-bold text-slate-900 truncate">
               {displayName}
-            </h3>
+            </DialogTitle>
             <span className="text-xs text-slate-400 shrink-0">{formatYearMonth(month)}</span>
           </div>
+          <DialogDescription id={descriptionId} className="sr-only">
+            선택한 카테고리의 거래 내역을 확인하고 편집합니다.
+          </DialogDescription>
           <span className="text-base font-bold text-slate-900 pr-6 shrink-0">
             {formatNumber(displayTotal)}원
           </span>
-        </div>
+        </DialogHeader>
 
         {/* 거래 목록 */}
         <div className="overflow-y-auto max-h-[calc(70vh-60px)]">
@@ -180,6 +159,14 @@ export function CategoryPopup({
                   key={tx.id}
                   className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-slate-50 active:bg-slate-100 transition-colors"
                   onClick={() => handleTransactionClick(tx)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleTransactionClick(tx);
+                    }
+                  }}
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-slate-900 truncate">
@@ -202,24 +189,17 @@ export function CategoryPopup({
             </div>
           )}
         </div>
-      </div>
+      </DialogContent>
 
       {/* 편집 모달 */}
       <EditModal
-        open={editModalOpen}
-        onOpenChange={handleEditModalClose}
-        transaction={selectedTransaction}
-        onFieldsChanged={handleFieldsChanged}
+        {...editFlow.editModalProps}
       />
 
       {/* 비슷한 거래 일괄 수정 모달 */}
-      <SimilarTransactionsModal
-        open={similarModalOpen}
-        onOpenChange={setSimilarModalOpen}
-        originalTransaction={changedTransaction}
-        newCategory={newCategory}
-        newMerchantName={newMerchantName}
-      />
-    </div>
+      {editFlow.similarModalProps && (
+        <SimilarTransactionsModal {...editFlow.similarModalProps} />
+      )}
+    </Dialog>
   );
 }

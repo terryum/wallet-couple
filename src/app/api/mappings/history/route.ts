@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/client';
+import { fetchMappingHistoryById } from '@/lib/services/mappings.service';
 
 /**
  * GET /api/mappings/history
@@ -23,24 +23,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // action_history에서 해당 매핑 관련 히스토리 조회
-    const { data: history, error } = await supabase
-      .from('action_history')
-      .select('*')
-      .eq('entity_type', 'mapping')
-      .eq('entity_id', mappingId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
+    const result = await fetchMappingHistoryById(mappingId);
+    if (result.error) {
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: result.error },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
       success: true,
-      data: history || [],
+      data: result.data || [],
     });
   } catch (err) {
     return NextResponse.json(

@@ -13,6 +13,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,8 +23,9 @@ import { SimilarTransactionsModal } from './SimilarTransactionsModal';
 import { SwipeableRow } from './SwipeableRow';
 import { CATEGORY_COLORS } from './TransactionRow';
 import { useDeleteTransaction } from '@/hooks/useTransactions';
+import { useTransactionEditFlow } from '@/hooks/useTransactionEditFlow';
 import { useModalBackHandler } from '@/hooks/useModalBackHandler';
-import type { Category, Transaction, TransactionType } from '@/types';
+import type { Transaction } from '@/types';
 import { useQueryClient } from '@tanstack/react-query';
 
 /** 2단계 팝업을 지원하는 소스 타입 (소득+지출 동시 처리) */
@@ -58,32 +60,10 @@ export function UploadResultPopup({
   // 삭제 뮤테이션
   const { mutate: deleteTransaction } = useDeleteTransaction();
 
-  // EditModal 상태
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-
-  // SimilarTransactionsModal 상태
-  const [similarModalOpen, setSimilarModalOpen] = useState(false);
-  const [changedTransaction, setChangedTransaction] = useState<Transaction | null>(null);
-  const [newCategory, setNewCategory] = useState<Category | null>(null);
-  const [newMerchantName, setNewMerchantName] = useState<string | null>(null);
-
-  // 자식 모달이 열려있는지 체크 (열려있으면 뒤로가기로 닫지 않음)
-  const isChildModalOpen = editModalOpen || similarModalOpen;
-
   // 뒤로가기 버튼 처리 - 자식 모달이 없을 때만 닫기
   const handleClose = useCallback(() => {
     onOpenChange(false);
   }, [onOpenChange]);
-
-  // 부모 팝업의 history state는 유지하되, 자식 모달이 열려있으면 back 핸들러만 비활성화
-  // phase가 바뀌면 새로운 modalId를 사용하여 history state를 갱신
-  useModalBackHandler({
-    isOpen: open,
-    onClose: handleClose,
-    modalId: `upload-result-popup-${phase}`, // phase별 다른 modalId
-    disabled: isChildModalOpen, // 자식 모달이 열려있으면 back 핸들링 비활성화
-  });
 
   // 지출/소득 분리
   const expenseTransactions = allTransactions.filter(
@@ -124,6 +104,38 @@ export function UploadResultPopup({
     }
   }, [fileId]);
 
+  const editFlow = useTransactionEditFlow({
+    openSimilarDelayMs: 50,
+    modalIdBase: `upload-result-${fileId ?? 'unknown'}`,
+    onEditClose: () => {
+      fetchTransactions(false);
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    },
+    onFieldsChanged: (transaction, changes) => {
+      setAllTransactions((prev) =>
+        prev.map((t) => {
+          if (t.id !== transaction.id) return t;
+          const updated = { ...t };
+          if (changes.merchant) updated.merchant_name = changes.merchant.new;
+          if (changes.category) updated.category = changes.category.new;
+          return updated;
+        })
+      );
+    },
+  });
+
+  // 자식 모달이 열려있는지 체크 (열려있으면 뒤로가기로 닫지 않음)
+  const isChildModalOpen = editFlow.isSubModalOpen;
+
+  // 부모 팝업의 history state는 유지하되, 자식 모달이 열려있으면 back 핸들러만 비활성화
+  // phase가 바뀌면 새로운 modalId를 사용하여 history state를 갱신
+  useModalBackHandler({
+    isOpen: open,
+    onClose: handleClose,
+    modalId: `upload-result-popup-${phase}`, // phase별 다른 modalId
+    disabled: isChildModalOpen, // 자식 모달이 열려있으면 back 핸들링 비활성화
+  });
+
   // 팝업 열릴 때 데이터 조회
   useEffect(() => {
     if (!open || !fileId) {
@@ -137,8 +149,7 @@ export function UploadResultPopup({
 
   // 거래 항목 클릭 시 EditModal 열기
   const handleTransactionClick = (transaction: Transaction) => {
-    setSelectedTransaction(transaction);
-    setEditModalOpen(true);
+    editFlow.openEdit(transaction);
   };
 
   // 거래 삭제 (Optimistic Update)
@@ -154,55 +165,6 @@ export function UploadResultPopup({
     });
   };
 
-  // 이용처 또는 카테고리 변경 후 비슷한 거래 찾기
-  const handleFieldsChanged = (
-    transaction: Transaction,
-    changes: {
-      merchant?: { old: string; new: string };
-      category?: { old: Category; new: Category };
-    }
-  ) => {
-    // 로컬 상태 업데이트
-    setAllTransactions((prev) =>
-      prev.map((t) => {
-        if (t.id !== transaction.id) return t;
-        const updated = { ...t };
-        if (changes.merchant) updated.merchant_name = changes.merchant.new;
-        if (changes.category) updated.category = changes.category.new;
-        return updated;
-      })
-    );
-
-    // 원래 값으로 transaction 복원
-    const originalTx = { ...transaction };
-    if (changes.merchant) {
-      originalTx.merchant_name = changes.merchant.old;
-    }
-    if (changes.category) {
-      originalTx.category = changes.category.old;
-    }
-
-    // EditModal의 history.back()이 완료된 후에 SimilarTransactionsModal 열기
-    // (history 이벤트 race condition 방지)
-    setTimeout(() => {
-      setChangedTransaction(originalTx);
-      setNewMerchantName(changes.merchant?.new || null);
-      setNewCategory(changes.category?.new || null);
-      setSimilarModalOpen(true);
-    }, 50);
-  };
-
-  // EditModal 닫힐 때 데이터 갱신
-  const handleEditModalClose = (isOpen: boolean) => {
-    setEditModalOpen(isOpen);
-    if (!isOpen) {
-      // 로컬 상태 새로고침 (삭제/수정 반영, phase 유지)
-      fetchTransactions(false);
-      // React Query 캐시도 무효화
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
-    }
-  };
-
   const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
 
   return (
@@ -214,6 +176,9 @@ export function UploadResultPopup({
               <FileSpreadsheet className={`w-5 h-5 ${phase === 'income' ? 'text-blue-600' : 'text-green-600'}`} />
               {phaseTitle}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              업로드된 거래 내역을 확인하고 편집할 수 있습니다.
+            </DialogDescription>
             {!isLoading && transactions.length > 0 && (
               <p className="text-sm text-slate-500">
                 {transactions.length}건 · 총 {formatNumber(totalAmount)}원
@@ -312,20 +277,16 @@ export function UploadResultPopup({
 
       {/* 편집 모달 */}
       <EditModal
-        open={editModalOpen}
-        onOpenChange={handleEditModalClose}
-        transaction={selectedTransaction}
-        onFieldsChanged={handleFieldsChanged}
+        {...editFlow.editModalProps}
       />
 
       {/* 비슷한 거래 일괄 수정 모달 */}
-      <SimilarTransactionsModal
-        open={similarModalOpen}
-        onOpenChange={setSimilarModalOpen}
-        originalTransaction={changedTransaction}
-        newCategory={newCategory}
-        newMerchantName={newMerchantName}
-      />
+      {editFlow.similarModalProps && (
+        <SimilarTransactionsModal
+          {...editFlow.similarModalProps}
+          onBulkUpdated={() => fetchTransactions(false)}
+        />
+      )}
     </>
   );
 }

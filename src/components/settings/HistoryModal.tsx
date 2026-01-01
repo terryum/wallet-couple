@@ -4,16 +4,18 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { History, RotateCcw, Upload, Plus, Pencil, Trash2, Loader2, Eye } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useActionHistory, useUndoHistory } from '@/hooks/useHistory';
+import { useModalBackHandler } from '@/hooks/useModalBackHandler';
 import { UploadResultPopup } from '@/components/transactions/UploadResultPopup';
 import type { ActionHistory, ActionType } from '@/types';
 
@@ -92,6 +94,17 @@ export function HistoryModal({ open, onOpenChange }: HistoryModalProps) {
   const [uploadFileId, setUploadFileId] = useState<string | null>(null);
   const [uploadDisplayName, setUploadDisplayName] = useState<string>('');
 
+  const handleClose = useCallback(() => {
+    onOpenChange(false);
+  }, [onOpenChange]);
+
+  useModalBackHandler({
+    isOpen: open,
+    onClose: handleClose,
+    modalId: 'history-modal',
+    disabled: showUploadPopup,
+  });
+
   const histories = historyData?.data || [];
 
   // 업로드 히스토리 클릭 핸들러
@@ -135,6 +148,9 @@ export function HistoryModal({ open, onOpenChange }: HistoryModalProps) {
             <History className="w-5 h-5" />
             변경 히스토리
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            최근 변경 내역을 확인하고 필요하면 되돌립니다.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto -mx-6 px-6">

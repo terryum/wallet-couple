@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ChevronRight, FolderOpen, RotateCcw, Download, Smartphone, Check, Share, Tags } from 'lucide-react';
 import {
   Sheet,
@@ -17,10 +17,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { FileManagement } from './FileManagement';
 import { MappingsManagement } from './MappingsManagement';
 import { ResetConfirmDialog } from './ResetConfirmDialog';
+import { useModalBackHandler } from '@/hooks/useModalBackHandler';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 interface SettingsSheetProps {
@@ -84,6 +86,50 @@ export function SettingsSheet({ open, onOpenChange, onUploadClick }: SettingsShe
       }, 200);
     }
   };
+
+  const handleFileManagementClose = useCallback(() => {
+    setFileManagementOpen(false);
+  }, []);
+
+  const handleMappingsManagementClose = useCallback(() => {
+    setMappingsManagementOpen(false);
+  }, []);
+
+  const handleIosGuideClose = useCallback(() => {
+    setIosGuideOpen(false);
+  }, []);
+
+  const handleDesktopGuideClose = useCallback(() => {
+    setDesktopGuideOpen(false);
+  }, []);
+
+  useModalBackHandler({
+    isOpen: fileManagementOpen,
+    onClose: handleFileManagementClose,
+    modalId: 'settings-sheet-file-management',
+    disabled: mappingsManagementOpen || resetDialogOpen || iosGuideOpen || desktopGuideOpen,
+  });
+
+  useModalBackHandler({
+    isOpen: mappingsManagementOpen,
+    onClose: handleMappingsManagementClose,
+    modalId: 'settings-sheet-mappings-management',
+    disabled: fileManagementOpen || resetDialogOpen || iosGuideOpen || desktopGuideOpen,
+  });
+
+  useModalBackHandler({
+    isOpen: iosGuideOpen,
+    onClose: handleIosGuideClose,
+    modalId: 'settings-sheet-ios-guide',
+    disabled: fileManagementOpen || mappingsManagementOpen || resetDialogOpen || desktopGuideOpen,
+  });
+
+  useModalBackHandler({
+    isOpen: desktopGuideOpen,
+    onClose: handleDesktopGuideClose,
+    modalId: 'settings-sheet-desktop-guide',
+    disabled: fileManagementOpen || mappingsManagementOpen || resetDialogOpen || iosGuideOpen,
+  });
 
   return (
     <>
@@ -201,6 +247,9 @@ export function SettingsSheet({ open, onOpenChange, onUploadClick }: SettingsShe
             <DialogTitle className="text-lg font-bold tracking-tight text-slate-900">
               업로드 파일 관리
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              업로드한 파일 목록을 확인하고 삭제할 수 있습니다.
+            </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto -mx-6 px-6">
             <FileManagement onUploadClick={handleUploadFromFileManagement} />
@@ -215,6 +264,9 @@ export function SettingsSheet({ open, onOpenChange, onUploadClick }: SettingsShe
             <DialogTitle className="text-lg font-bold tracking-tight text-slate-900">
               패턴 매핑 관리
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              자동 분류 규칙을 확인하고 수정합니다.
+            </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto -mx-6 px-6">
             <MappingsManagement />
@@ -236,6 +288,9 @@ export function SettingsSheet({ open, onOpenChange, onUploadClick }: SettingsShe
               <Smartphone className="w-5 h-5 text-[#3182F6]" />
               앱 설치 방법
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              iOS에서 홈 화면에 앱을 추가하는 방법을 안내합니다.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
@@ -304,6 +359,9 @@ export function SettingsSheet({ open, onOpenChange, onUploadClick }: SettingsShe
               <Smartphone className="w-5 h-5 text-[#3182F6]" />
               앱 설치 방법
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              데스크톱 또는 안드로이드에서 설치하는 방법을 안내합니다.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">

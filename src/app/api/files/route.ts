@@ -5,14 +5,14 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getUploadedFiles, deleteAllFiles } from '@/lib/supabase/queries';
+import { fetchUploadedFiles, removeAllFiles } from '@/lib/services/files.service';
 
 /**
  * 업로드된 파일 목록 조회
  */
 export async function GET(): Promise<NextResponse> {
   try {
-    const result = await getUploadedFiles();
+    const result = await fetchUploadedFiles();
 
     if (result.error) {
       return NextResponse.json(
@@ -42,7 +42,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     const { searchParams } = new URL(request.url);
     const preserveMappings = searchParams.get('preserveMappings') === 'true';
 
-    const result = await deleteAllFiles(preserveMappings);
+    const result = await removeAllFiles(preserveMappings);
 
     if (result.error) {
       return NextResponse.json(

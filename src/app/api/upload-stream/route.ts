@@ -10,99 +10,30 @@ import {
   createUploadedFile,
   createTransactionsWithFileId,
   updateFileTransactionCount,
-  createActionHistory,
-  createManualEntries,
   deleteTransactionsByFileId,
   deleteUploadedFile,
 } from '@/lib/supabase/queries';
-import { classifyTransactions, classifyIncomeTransactions, applyMerchantNameMappings, type ClassifyInput } from '@/lib/classifier';
-import type { CreateTransactionDto, Owner, ParsedTransaction, Category } from '@/types';
-
-/** 카드사 이름 매핑 */
-const SOURCE_TYPE_NAMES: Record<string, string> = {
-  '현대카드': '현대카드',
-  '롯데카드': '롯데카드',
-  '삼성카드': '삼성카드',
-  'KB카드': 'KB카드',
-  '토스뱅크카드': '토스뱅크카드',
-  '온누리': '온누리상품권',
-  '성남사랑': '성남사랑상품권',
-  '직접입력': '직접입력',
-  '기타': '기타',
-};
-
-/** Owner 한글 이름 */
-const OWNER_NAMES: Record<Owner, string> = {
-  husband: '남편',
-  wife: '아내',
-};
+import { createActionHistory } from '@/lib/repositories/action-history.repo';
+import { createManualEntries } from '@/lib/repositories/manual-entries.repo';
+import { classifyTransactions, classifyIncomeTransactions, applyMerchantNameMappings } from '@/lib/classifier';
+import type { CreateTransactionDto, Owner, Category } from '@/types';
+import { OWNER_NAMES } from '@/lib/ingestion/constants';
+import {
+  extractBillingMonthFromFilename,
+  extractBillingMonthFromTransactions,
+  generateDisplayName,
+} from '@/lib/ingestion/billing';
+import { buildManualTransactions } from '@/lib/ingestion/manual';
+import {
+  prepareClassificationInputs,
+  mergeCategoryMaps,
+} from '@/lib/ingestion/classify';
+import { buildTransactionsWithFileId } from '@/lib/ingestion/transform';
 
 /** SSE 이벤트 전송 헬퍼 */
 function sendEvent(controller: ReadableStreamDefaultController, event: string, data: unknown) {
   const encoder = new TextEncoder();
   controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-}
-
-/**
- * 파일 이름에서 청구월 추출 시도
- */
-function extractBillingMonthFromFilename(filename: string): string | null {
-  const patterns = [
-    /(\d{4})(\d{2})/,
-    /(\d{4})[-_](\d{2})/,
-    /(\d{4})년\s*(\d{1,2})월/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = filename.match(pattern);
-    if (match) {
-      const year = match[1];
-      const month = match[2].padStart(2, '0');
-      return `${year}-${month}`;
-    }
-  }
-  return null;
-}
-
-/**
- * 거래 내역에서 청구월 추출
- */
-function extractBillingMonthFromTransactions(transactions: ParsedTransaction[]): string | null {
-  if (transactions.length === 0) return null;
-
-  const normalTransactions = transactions.filter(t => !t.is_installment);
-  const dates = normalTransactions
-    .map(t => t.date)
-    .filter(d => d)
-    .sort()
-    .reverse();
-
-  if (dates.length === 0) return null;
-  return dates[0].substring(0, 7);
-}
-
-/**
- * 표시용 파일 이름 생성
- */
-function generateDisplayName(
-  originalFilename: string,
-  sourceType: string,
-  owner: Owner,
-  billingMonth: string | null
-): string {
-  const ext = originalFilename.split('.').pop() || 'xls';
-  const sourceName = SOURCE_TYPE_NAMES[sourceType] || sourceType;
-  const ownerName = OWNER_NAMES[owner];
-
-  if (billingMonth) {
-    const [year, month] = billingMonth.split('-');
-    return `${year}년_${parseInt(month)}월_${ownerName}_${sourceName}.${ext}`;
-  }
-
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  return `${year}년_${month}월_${ownerName}_${sourceName}.${ext}`;
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -161,15 +92,10 @@ export async function POST(request: NextRequest): Promise<Response> {
               const ownerName = OWNER_NAMES[owner];
               const displayName = `${ownerName}_직접입력.xlsx`;
 
-              const transactionsToInsert: CreateTransactionDto[] = parseResult.data.map((item) => ({
-                transaction_date: item.date,
-                merchant_name: item.merchant,
-                amount: item.amount,
-                category: item.category,
-                source_type: '직접입력',
-                owner,
-                raw_data: { original: item },
-              }));
+              const transactionsToInsert: CreateTransactionDto[] = buildManualTransactions(
+                parseResult.data,
+                owner
+              );
 
               const insertResult = await createManualEntries(transactionsToInsert);
 
@@ -247,43 +173,9 @@ export async function POST(request: NextRequest): Promise<Response> {
             // 이용처명 매핑 적용
             const mappedData = await applyMerchantNameMappings(parseResult.data);
 
-            // AI 분류 준비 - 지출/소득 분리
-            // 로더가 설정한 특정 카테고리는 유지하고, 기본 카테고리만 AI 분류
-            const expenseInputs: ClassifyInput[] = [];
-            const incomeInputs: ClassifyInput[] = [];
-            const installmentIndices = new Set<number>();
-            const presetCategories = new Set<number>(); // 로더가 설정한 카테고리 인덱스
-
-            mappedData.forEach((item, idx) => {
-              if (item.is_installment === true || item.category === '기존할부') {
-                installmentIndices.add(idx);
-              } else if (item.transaction_type === 'income') {
-                // 소득 거래 - '기타소득'만 AI 분류 대상
-                if (item.category === '기타소득') {
-                  incomeInputs.push({
-                    index: idx,
-                    merchant: item.merchant,
-                    amount: item.amount,
-                  });
-                } else {
-                  // 로더가 설정한 특정 카테고리 유지
-                  presetCategories.add(idx);
-                }
-              } else {
-                // 지출 거래 - '기타'만 AI 분류 대상
-                if (item.category === '기타') {
-                  expenseInputs.push({
-                    index: idx,
-                    merchant: item.merchant,
-                    amount: item.amount,
-                  });
-                } else {
-                  // 로더가 설정한 특정 카테고리 유지
-                  presetCategories.add(idx);
-                }
-              }
-            });
-
+            // AI 분류 준비 - 기본 카테고리만 분류
+            const prep = prepareClassificationInputs(mappedData, 'defaultOnly');
+            const { expenseInputs, incomeInputs, installmentIndices } = prep;
             const totalToClassify = expenseInputs.length + incomeInputs.length;
 
             sendEvent(controller, 'classifying_start', {
@@ -294,33 +186,28 @@ export async function POST(request: NextRequest): Promise<Response> {
 
             // AI 분류 (진행 상황 콜백 포함) - 지출/소득 각각
             let categoryMap: Map<number, Category> = new Map();
-            let classifiedCount = 0;
 
             try {
-              // 지출 분류
+              let expenseMap: Map<number, Category> = new Map();
+              let incomeMap: Map<number, Category> = new Map();
+
               if (expenseInputs.length > 0) {
-                const expenseResults = await classifyTransactions(
+                expenseMap = await classifyTransactions(
                   expenseInputs,
                   (current, total, phase) => {
-                    classifiedCount = current;
                     sendEvent(controller, 'classifying_progress', {
                       fileIndex,
                       fileName,
-                      current: classifiedCount,
+                      current,
                       total: totalToClassify,
                       phase,
                     });
                   }
                 );
-                // 원본 인덱스로 매핑 (expenseInputs[i].index가 mappedData의 인덱스)
-                expenseResults.forEach((cat, i) => {
-                  categoryMap.set(expenseInputs[i].index, cat);
-                });
               }
 
-              // 소득 분류
               if (incomeInputs.length > 0) {
-                const incomeResults = await classifyIncomeTransactions(
+                incomeMap = await classifyIncomeTransactions(
                   incomeInputs,
                   (current, total, phase) => {
                     sendEvent(controller, 'classifying_progress', {
@@ -332,11 +219,9 @@ export async function POST(request: NextRequest): Promise<Response> {
                     });
                   }
                 );
-                // 원본 인덱스로 매핑 (incomeInputs[i].index가 mappedData의 인덱스)
-                incomeResults.forEach((cat, i) => {
-                  categoryMap.set(incomeInputs[i].index, cat);
-                });
               }
+
+              categoryMap = mergeCategoryMaps(expenseMap, incomeMap);
             } catch (error) {
               console.error('AI 분류 실패, 기본 카테고리 사용:', error);
             }
@@ -346,34 +231,17 @@ export async function POST(request: NextRequest): Promise<Response> {
               fileName,
             });
 
-            // 기존할부 날짜 처리
-            const getInstallmentDate = (originalDate: string, targetMonth: string | null): string => {
-              if (targetMonth) {
-                return `${targetMonth}-25`;
-              }
-              return `${originalDate.substring(0, 7)}-25`;
-            };
-
             // DB에 저장할 데이터 준비
-            const transactionsToInsert: (CreateTransactionDto & { file_id: string })[] =
-              mappedData.map((item, idx) => {
-                const isInstallment = installmentIndices.has(idx);
-                return {
-                  transaction_date: isInstallment
-                    ? getInstallmentDate(item.date, billingMonth)
-                    : item.date,
-                  merchant_name: item.merchant,
-                  amount: item.amount,
-                  category: isInstallment
-                    ? '기존할부'
-                    : (categoryMap.get(idx) || item.category),
-                  source_type: parseResult.source_type,
-                  owner,
-                  transaction_type: item.transaction_type || 'expense',
-                  raw_data: { original: parseResult.data[idx], row_index: idx },
-                  file_id: fileId,
-                };
-              });
+            const transactionsToInsert = buildTransactionsWithFileId({
+              mappedData,
+              originalData: parseResult.data,
+              categoryMap,
+              installmentIndices,
+              billingMonth,
+              sourceType: parseResult.source_type,
+              owner,
+              fileId,
+            });
 
             sendEvent(controller, 'saving', { fileIndex, fileName });
 

@@ -13,6 +13,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { Owner } from '@/types';
 import { PasswordDialog } from './PasswordDialog';
 import { UploadResultPopup } from './UploadResultPopup';
+import { getPasswordPattern, getSourceDisplayName } from '@/lib/upload/filePatterns';
+import { readUploadStream } from '@/lib/upload/streaming';
 
 interface FileUploaderProps {
   owner: Owner;
@@ -73,54 +75,12 @@ function savePassword(pattern: string, password: string): void {
   }
 }
 
-/** 파일명에서 비밀번호 패턴 찾기 (저장/로드용) */
-function getPasswordPattern(fileName: string): string | null {
-  const lowerName = fileName.toLowerCase();
-  const patterns = ['chak']; // 지원하는 패턴들
-  for (const pattern of patterns) {
-    if (lowerName.includes(pattern)) {
-      return pattern;
-    }
-  }
-  return null;
-}
-
 /** 파일에 대해 저장된 비밀번호 가져오기 */
 function getSavedPasswordForFile(fileName: string): string | null {
   const pattern = getPasswordPattern(fileName);
   if (!pattern) return null;
   const passwords = getSavedPasswords();
   return passwords[pattern] || null;
-}
-
-/** 파일명에서 소스 타입 추출 (분석 중 표시용) */
-function getSourceDisplayName(fileName: string): string {
-  const name = fileName.toLowerCase();
-
-  // 카드사
-  if (name.includes('hyundai') || name.includes('현대')) {
-    return '현대카드 명세서';
-  } else if (name.includes('samsung') || name.includes('삼성')) {
-    return '삼성카드 명세서';
-  } else if (name.includes('lotte') || name.includes('롯데') || name.includes('이용대금명세서')) {
-    return '롯데카드 명세서';
-  } else if (name.includes('kb') || name.includes('국민') || name.includes('usage')) {
-    return 'KB국민카드 명세서';
-  }
-  // 은행
-  else if (name.includes('거래내역') || name.includes('woori') || name.includes('우리')) {
-    return '우리은행 거래내역';
-  }
-  // 상품권/지역화폐
-  else if (name.includes('온누리') || name.includes('onnuri')) {
-    return '온누리상품권';
-  } else if (name.includes('성남') || name.includes('seongnam') || name.includes('결제내역') || name.includes('chak') || name.includes('차크') || name.includes('이용내역')) {
-    return '성남사랑상품권';
-  }
-  // 기본값
-  else {
-    return '파일';
-  }
 }
 
 export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
@@ -133,18 +93,23 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
   const abortControllerRef = useRef<AbortController | null>(null);
   const createdFileIdsRef = useRef<string[]>([]);
 
-  // 마지막 업로드 정보 (stale closure 방지용)
-  const lastUploadInfoRef = useRef<{
-    fileId?: string;
-    displayName?: string;
-    sourceType?: string;
-  }>({});
+  const fileInfoRef = useRef<Record<string, { displayName?: string; sourceType?: string }>>({});
 
   // 업로드 결과 팝업 상태
   const [showResultPopup, setShowResultPopup] = useState(false);
   const [resultFileId, setResultFileId] = useState<string | null>(null);
   const [resultDisplayName, setResultDisplayName] = useState<string>('');
   const [resultSourceType, setResultSourceType] = useState<string>('');
+  const [popupQueue, setPopupQueue] = useState<string[]>([]);
+  const [popupIndex, setPopupIndex] = useState(0);
+
+  const openResultPopupForFile = useCallback((fileId: string) => {
+    const info = fileInfoRef.current[fileId];
+    setResultFileId(fileId);
+    setResultDisplayName(info?.displayName || '업로드 내역');
+    setResultSourceType(info?.sourceType || '');
+    setShowResultPopup(true);
+  }, []);
 
   /** 업로드 취소 및 롤백 */
   const handleCancel = async () => {
@@ -216,136 +181,131 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
         throw new Error('업로드 실패');
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('스트림을 읽을 수 없습니다.');
-
-      const decoder = new TextDecoder();
-      let buffer = '';
       let inserted = 0;
       let duplicates = 0;
       let fileId: string | undefined;
+      let streamFailure = false;
+      let passwordErrorCode: string | null = null;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      const handleStreamEvent = (eventType: string, data: any) => {
+        switch (eventType) {
+          case 'file_start':
+            setCurrentIndex(fileIndex);
+            setFileProgresses((prev) =>
+              prev.map((p, idx) =>
+                idx === fileIndex ? { ...p, status: 'uploading' } : p
+              )
+            );
+            return;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+          case 'parsing':
+            setFileProgresses((prev) =>
+              prev.map((p, idx) =>
+                idx === fileIndex ? { ...p, status: 'parsing' } : p
+              )
+            );
+            return;
 
-        for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            const eventType = line.slice(7);
-            const dataLine = lines[lines.indexOf(line) + 1];
-            if (dataLine?.startsWith('data: ')) {
-              const data = JSON.parse(dataLine.slice(6));
+          case 'classifying_start':
+            setFileProgresses((prev) =>
+              prev.map((p, idx) =>
+                idx === fileIndex
+                  ? { ...p, status: 'classifying', classifyProgress: { current: 0, total: data.total } }
+                  : p
+              )
+            );
+            return;
 
-              switch (eventType) {
-                case 'file_start':
-                  setCurrentIndex(fileIndex);
-                  setFileProgresses((prev) =>
-                    prev.map((p, idx) =>
-                      idx === fileIndex ? { ...p, status: 'uploading' } : p
-                    )
-                  );
-                  break;
+          case 'classifying_progress':
+            setFileProgresses((prev) =>
+              prev.map((p, idx) =>
+                idx === fileIndex
+                  ? { ...p, classifyProgress: { current: data.current, total: data.total } }
+                  : p
+              )
+            );
+            return;
 
-                case 'parsing':
-                  setFileProgresses((prev) =>
-                    prev.map((p, idx) =>
-                      idx === fileIndex ? { ...p, status: 'parsing' } : p
-                    )
-                  );
-                  break;
+          case 'classifying_complete':
+            return;
 
-                case 'classifying_start':
-                  setFileProgresses((prev) =>
-                    prev.map((p, idx) =>
-                      idx === fileIndex
-                        ? { ...p, status: 'classifying', classifyProgress: { current: 0, total: data.total } }
-                        : p
-                    )
-                  );
-                  break;
+          case 'saving':
+            setFileProgresses((prev) =>
+              prev.map((p, idx) =>
+                idx === fileIndex ? { ...p, status: 'saving' } : p
+              )
+            );
+            return;
 
-                case 'classifying_progress':
-                  setFileProgresses((prev) =>
-                    prev.map((p, idx) =>
-                      idx === fileIndex
-                        ? { ...p, classifyProgress: { current: data.current, total: data.total } }
-                        : p
-                    )
-                  );
-                  break;
-
-                case 'classifying_complete':
-                  break;
-
-                case 'saving':
-                  setFileProgresses((prev) =>
-                    prev.map((p, idx) =>
-                      idx === fileIndex ? { ...p, status: 'saving' } : p
-                    )
-                  );
-                  break;
-
-                case 'file_complete':
-                  if (data.fileId) {
-                    createdFileIdsRef.current.push(data.fileId);
-                    fileId = data.fileId;
-                  }
-                  inserted = data.inserted || 0;
-                  duplicates = data.duplicates || 0;
-                  // ref에 최신 업로드 정보 저장 (첫 번째 성공 파일 기준)
-                  if (!lastUploadInfoRef.current.fileId && data.fileId) {
-                    lastUploadInfoRef.current = {
-                      fileId: data.fileId,
-                      displayName: data.displayName,
-                      sourceType: data.sourceType,
-                    };
-                  }
-                  setFileProgresses((prev) =>
-                    prev.map((p, idx) =>
-                      idx === fileIndex
-                        ? {
-                            ...p,
-                            status: 'completed',
-                            displayName: data.displayName || p.displayName,
-                            result: {
-                              sourceType: data.sourceType,
-                              inserted: data.inserted,
-                              duplicates: data.duplicates,
-                              fileId: data.fileId,
-                            },
-                          }
-                        : p
-                    )
-                  );
-                  break;
-
-                case 'file_error':
-                  // 비밀번호 필요 에러는 별도 처리
-                  if (data.error_code === 'PASSWORD_REQUIRED' || data.error_code === 'WRONG_PASSWORD') {
-                    return { needPassword: true, error_code: data.error_code };
-                  }
-                  setFileProgresses((prev) =>
-                    prev.map((p, idx) =>
-                      idx === fileIndex
-                        ? { ...p, status: 'error', error: data.error, error_code: data.error_code }
-                        : p
-                    )
-                  );
-                  return { success: false };
-
-                case 'complete':
-                  break;
-
-                case 'error':
-                  return { success: false };
-              }
+          case 'file_complete':
+            if (data.fileId) {
+              createdFileIdsRef.current.push(data.fileId);
+              fileInfoRef.current[data.fileId] = {
+                displayName: data.displayName,
+                sourceType: data.sourceType,
+              };
+              fileId = data.fileId;
             }
-          }
+            inserted = data.inserted || 0;
+            duplicates = data.duplicates || 0;
+            setFileProgresses((prev) =>
+              prev.map((p, idx) =>
+                idx === fileIndex
+                  ? {
+                      ...p,
+                      status: 'completed',
+                      displayName: data.displayName || p.displayName,
+                      result: {
+                        sourceType: data.sourceType,
+                        inserted: data.inserted,
+                        duplicates: data.duplicates,
+                        fileId: data.fileId,
+                      },
+                    }
+                  : p
+              )
+            );
+            return;
+
+          case 'file_error':
+            if (data.error_code === 'PASSWORD_REQUIRED' || data.error_code === 'WRONG_PASSWORD') {
+              passwordErrorCode = data.error_code;
+              throw new Error('password_required');
+            }
+            setFileProgresses((prev) =>
+              prev.map((p, idx) =>
+                idx === fileIndex
+                  ? { ...p, status: 'error', error: data.error, error_code: data.error_code }
+                  : p
+              )
+            );
+            streamFailure = true;
+            throw new Error('stream_error');
+
+          case 'error':
+            streamFailure = true;
+            throw new Error('stream_error');
+
+          default:
+            return;
         }
+      };
+
+      try {
+        await readUploadStream(response, ({ type, data }) => {
+          handleStreamEvent(type, data);
+        });
+      } catch (streamError) {
+        if (passwordErrorCode) {
+          return { needPassword: true, error_code: passwordErrorCode };
+        }
+        if (streamFailure) {
+          return { success: false };
+        }
+        if ((streamError as Error).message === 'password_required') {
+          return { needPassword: true, error_code: passwordErrorCode || undefined };
+        }
+        throw streamError;
       }
 
       return { success: true, inserted, duplicates, fileId };
@@ -375,7 +335,7 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
     // AbortController 생성
     abortControllerRef.current = new AbortController();
     createdFileIdsRef.current = [];
-    lastUploadInfoRef.current = {};
+    fileInfoRef.current = {};
 
     let totalInserted = 0;
     let totalDuplicates = 0;
@@ -494,6 +454,8 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
     // 결과 캐시 갱신
     queryClient.invalidateQueries({ queryKey: ['transactions'] });
     queryClient.invalidateQueries({ queryKey: ['uploaded_files'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['billing-comparison'] });
 
     // 결과 메시지
     setIsError(hasError && totalInserted === 0);
@@ -505,22 +467,19 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
     setShowResult(true);
 
     // 성공 시 업로드 결과 팝업 표시 준비 - ref를 사용하여 최신 상태 참조
-    const uploadInfo = lastUploadInfoRef.current;
-
     setTimeout(() => {
       setShowResult(false);
       setFileProgresses([]);
 
       // 성공적으로 업로드된 파일이 있으면 팝업 표시
-      if (totalInserted > 0 && uploadInfo.fileId) {
-        setResultFileId(uploadInfo.fileId);
-        setResultDisplayName(uploadInfo.displayName || '업로드 내역');
-        setResultSourceType(uploadInfo.sourceType || '');
-        setShowResultPopup(true);
+            const uniqueFileIds = Array.from(new Set(createdFileIdsRef.current));
+      setPopupQueue(uniqueFileIds);
+      setPopupIndex(0);
+      if (uniqueFileIds.length > 0) {
+        openResultPopupForFile(uniqueFileIds[0]);
       }
 
       createdFileIdsRef.current = [];
-      lastUploadInfoRef.current = {};
     }, 2000);
 
     onSuccess?.();
@@ -872,7 +831,22 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
       {/* 업로드 결과 팝업 */}
       <UploadResultPopup
         open={showResultPopup}
-        onOpenChange={setShowResultPopup}
+        onOpenChange={(open) => {
+          if (open) {
+            setShowResultPopup(true);
+            return;
+          }
+          const nextIndex = popupIndex + 1;
+          if (nextIndex < popupQueue.length) {
+            setPopupIndex(nextIndex);
+            openResultPopupForFile(popupQueue[nextIndex]);
+          } else {
+            setShowResultPopup(false);
+            setPopupQueue([]);
+            setPopupIndex(0);
+            fileInfoRef.current = {};
+          }
+        }}
         fileId={resultFileId}
         displayName={resultDisplayName}
         sourceType={resultSourceType}
