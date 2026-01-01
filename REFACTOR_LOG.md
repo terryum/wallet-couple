@@ -8,6 +8,7 @@
 - 청구 비교/대시보드 데이터 분리
 
 ## 최근 추가 (2026-01-01)
+- SUPABASE_ANON_KEY 환경변수 인식 추가 (src/lib/supabase/client.ts)
 - 사용자 커스텀 설정 중앙 관리 시스템 도입 (src/lib/customizations/)
   - registry.ts: 모든 커스텀 설정 등록 및 관리
   - service.ts: 조회/삭제 로직
