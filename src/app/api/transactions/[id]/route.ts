@@ -286,39 +286,6 @@ export async function DELETE(
       );
     }
 
-    if (previousData) {
-      const merchantChanged = updates.merchant_name && updates.merchant_name !== previousData.merchant_name;
-      const categoryChanged = updates.category && updates.category !== previousData.category;
-
-      if (merchantChanged) {
-        try {
-          const pattern = extractPattern(previousData.merchant_name);
-          await supabase
-            .from('merchant_name_mappings')
-            .upsert(
-              {
-                original_pattern: pattern,
-                preferred_name: updates.merchant_name,
-                example_original: previousData.merchant_name,
-                match_count: 1,
-              },
-              { onConflict: 'original_pattern' }
-            );
-        } catch (mappingError) {
-          console.error('???? ?? ?? ??:', mappingError);
-        }
-      }
-
-      if (categoryChanged) {
-        const targetMerchant = (updates.merchant_name as string | undefined) || previousData.merchant_name;
-        try {
-          await saveCategoryMapping(targetMerchant, updates.category as any);
-        } catch (mappingError) {
-          console.error('???? ?? ?? ??:', mappingError);
-        }
-      }
-    }
-
     // 히스토리 기록
     if (previousData) {
       const formattedAmount = formatNumber(previousData.amount);

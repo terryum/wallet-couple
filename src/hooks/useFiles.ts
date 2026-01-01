@@ -93,15 +93,16 @@ export function useDeleteAllFiles() {
 
 /**
  * 전체 초기화 (모든 데이터 삭제)
- * @param preserveMappings - true인 경우 이름/카테고리 매핑 유지
+ * @param preserveCustomizations - true인 경우 사용자 커스텀 설정 유지
+ *   (카테고리 매핑, 이용처명 매핑 등 - registry.ts에 등록된 모든 항목)
  */
 export function useResetAllData() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (preserveMappings: boolean = false) => {
-      const url = preserveMappings
-        ? '/api/reset?preserveMappings=true'
+    mutationFn: async (preserveCustomizations: boolean = false) => {
+      const url = preserveCustomizations
+        ? '/api/reset?preserveCustomizations=true'
         : '/api/reset';
       const res = await fetch(url, {
         method: 'DELETE',

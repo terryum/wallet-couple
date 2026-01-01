@@ -22,7 +22,8 @@ interface ResetConfirmDialogProps {
 }
 
 export function ResetConfirmDialog({ open, onOpenChange }: ResetConfirmDialogProps) {
-  const [preserveMappings, setPreserveMappings] = useState(true);
+  // 사용자 커스텀 설정 유지 여부 (카테고리 매핑, 이용처명 매핑 등)
+  const [preserveCustomizations, setPreserveCustomizations] = useState(true);
   const { mutate: resetAll, isPending: isResetting } = useResetAllData();
 
   const handleClose = useCallback(() => {
@@ -36,10 +37,10 @@ export function ResetConfirmDialog({ open, onOpenChange }: ResetConfirmDialogPro
   });
 
   const handleResetConfirm = () => {
-    resetAll(preserveMappings, {
+    resetAll(preserveCustomizations, {
       onSuccess: () => {
         onOpenChange(false);
-        setPreserveMappings(true); // 초기화 후 기본값으로 복원
+        setPreserveCustomizations(true); // 초기화 후 기본값으로 복원
       },
     });
   };
@@ -64,16 +65,16 @@ export function ResetConfirmDialog({ open, onOpenChange }: ResetConfirmDialogPro
             <br />이 작업은 되돌릴 수 없습니다.
           </p>
 
-          {/* 매핑 유지 체크박스 */}
+          {/* 사용자 설정 유지 체크박스 */}
           <label className="flex items-center gap-2 mb-6 cursor-pointer self-start px-2">
             <input
               type="checkbox"
-              checked={preserveMappings}
-              onChange={(e) => setPreserveMappings(e.target.checked)}
+              checked={preserveCustomizations}
+              onChange={(e) => setPreserveCustomizations(e.target.checked)}
               className="w-4 h-4 rounded border-slate-300 text-[#3182F6] focus:ring-[#3182F6]"
             />
             <span className="text-sm text-slate-600">
-              이름/카테고리 커스텀 설정은 유지
+              사용자 설정 유지 (이용처/카테고리 매핑 등)
             </span>
           </label>
 

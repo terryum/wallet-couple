@@ -1,4 +1,4 @@
-import type { Category, CreateTransactionDto, Owner, ParsedTransaction } from '@/types';
+import type { Category, CreateTransactionDto, Owner, ParsedTransaction, SourceType } from '@/types';
 import { getInstallmentDate } from './billing';
 
 interface BuildTransactionsParams {
@@ -7,7 +7,7 @@ interface BuildTransactionsParams {
   categoryMap: Map<number, Category>;
   installmentIndices: Set<number>;
   billingMonth: string | null;
-  sourceType: string;
+  sourceType: SourceType;
   owner: Owner;
   fileId: string;
 }

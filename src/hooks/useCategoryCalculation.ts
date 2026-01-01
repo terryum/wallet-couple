@@ -185,12 +185,13 @@ export function buildStackedBarChartData(
     let etcCount = 0;
     for (const cat of month.byCategory) {
       const catName = cat.category as string;
+      const count = cat.count ?? 0;
       if (topCategories.includes(catName) && catName !== 'etc.') {
         result[catName] = cat.total_amount;
-        result[`${catName}_count`] = cat.count;
+        result[`${catName}_count`] = count;
       } else {
         etcTotal += cat.total_amount;
-        etcCount += cat.count;
+        etcCount += count;
       }
     }
     result['etc.'] = etcTotal;

@@ -630,17 +630,23 @@ export async function updateFileTransactionCount(
 
 /**
  * 전체 초기화 - 모든 데이터 삭제
- * transactions, uploaded_files, category_mappings, merchant_name_mappings
- * @param preserveMappings - true인 경우 이름/카테고리 매핑은 유지
+ * transactions, uploaded_files + 사용자 커스텀 설정 (옵션)
+ *
+ * @param preserveCustomizations - true인 경우 사용자 커스텀 설정은 유지
+ *   (카테고리 매핑, 이용처명 매핑 등 - registry.ts에 등록된 모든 항목)
  */
 export async function resetAllData(
-  preserveMappings: boolean = false
+  preserveCustomizations: boolean = false
 ): Promise<QueryResult<{ deleted: Record<string, number> }>> {
+  // 순환 참조 방지를 위해 동적 import 사용
+  const { deleteAllCustomizations, CUSTOMIZATION_CONFIGS } = await import(
+    '@/lib/customizations'
+  );
+
   try {
     const deleted: Record<string, number> = {};
 
-    // 1. transactions 테이블 (file_id가 있는 것은 uploaded_files 삭제 시 CASCADE로 삭제됨)
-    // file_id가 없는 거래 내역도 삭제
+    // 1. transactions 테이블
     const { data: txData } = await supabase.from('transactions').select('id');
     deleted.transactions = txData?.length || 0;
 
@@ -660,33 +666,27 @@ export async function resetAllData(
       .neq('id', '00000000-0000-0000-0000-000000000000');
     if (filesError) throw new Error(`uploaded_files 삭제 실패: ${filesError.message}`);
 
-    // 매핑 유지하지 않는 경우에만 매핑 테이블 삭제
-    if (!preserveMappings) {
-      // 3. category_mappings 테이블
-      const { data: catData } = await supabase.from('category_mappings').select('id');
-      deleted.category_mappings = catData?.length || 0;
+    // 3. 사용자 커스텀 설정 삭제 (레지스트리 기반)
+    // preserveCustomizations가 false인 경우에만 삭제
+    if (!preserveCustomizations) {
+      const customResult = await deleteAllCustomizations();
 
-      const { error: catError } = await supabase
-        .from('category_mappings')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (catError) throw new Error(`category_mappings 삭제 실패: ${catError.message}`);
+      // 삭제된 개수를 deleted에 병합
+      for (const config of CUSTOMIZATION_CONFIGS) {
+        deleted[config.tableName] = customResult.deleted[config.tableName] || 0;
+      }
 
-      // 4. merchant_name_mappings 테이블
-      const { data: merchantData } = await supabase.from('merchant_name_mappings').select('id');
-      deleted.merchant_name_mappings = merchantData?.length || 0;
-
-      const { error: merchantError } = await supabase
-        .from('merchant_name_mappings')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      if (merchantError) throw new Error(`merchant_name_mappings 삭제 실패: ${merchantError.message}`);
+      if (!customResult.success) {
+        console.error('커스텀 설정 삭제 중 일부 오류:', customResult.errors);
+      }
     } else {
-      deleted.category_mappings = 0;
-      deleted.merchant_name_mappings = 0;
+      // 유지하는 경우 0으로 표시
+      for (const config of CUSTOMIZATION_CONFIGS) {
+        deleted[config.tableName] = 0;
+      }
     }
 
-    // 5. action_history 테이블도 삭제
+    // 4. action_history 테이블도 삭제
     await supabase
       .from('action_history')
       .delete()
