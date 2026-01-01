@@ -17,11 +17,17 @@ import {
   type FileUploaderRef,
 } from '@/components/transactions';
 import { SharedHeader, SharedBottomNav } from '@/components/layout';
+import { SearchBar, FilterPanel } from '@/components/search';
 import { useAppContext } from '@/contexts/AppContext';
 import { useTransactions, useDeleteTransaction } from '@/hooks/useTransactions';
+import {
+  useSearchTransactions,
+  isSearchActive,
+  DEFAULT_FILTERS,
+} from '@/hooks/useSearchTransactions';
 import { useTransactionEditFlow } from '@/hooks/useTransactionEditFlow';
 import { formatNumber } from '@/lib/utils/format';
-import type { Transaction, Category } from '@/types';
+import type { Transaction, Category, SearchFilters } from '@/types';
 import { ALL_EXPENSE_CATEGORIES } from '@/types';
 
 /** 이전 월 계산 */
@@ -42,6 +48,10 @@ export default function HomePage() {
 
   // 로컬 상태
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>(DEFAULT_FILTERS);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const searchActive = isSearchActive(searchFilters);
+
   const editFlow = useTransactionEditFlow({
     owner: currentUser,
     openSimilarDelayMs: 50,
@@ -79,6 +89,16 @@ export default function HomePage() {
     includeSummary: true,
     // transactionType: 'expense' (기본값)
   });
+
+  // 검색 데이터 조회 (검색 활성화 시)
+  const { data: searchData, isLoading: searchLoading } = useSearchTransactions(
+    searchFilters,
+    {
+      enabled: searchActive,
+      currentMonth: selectedMonth,
+      owner: selectedOwner,
+    }
+  );
 
   // 카테고리별 합계 금액 계산 (지출만)
   const categoryTotals = useMemo(() => {
@@ -125,10 +145,16 @@ export default function HomePage() {
   // 삭제 뮤테이션
   const { mutate: deleteTransaction } = useDeleteTransaction();
 
-  // 필터된 거래 내역
+  // 필터된 거래 내역 (검색 활성화 시 검색 결과 사용)
   const transactions = useMemo(() => {
+    if (searchActive) {
+      return searchData?.data || [];
+    }
     return data?.data || [];
-  }, [data]);
+  }, [searchActive, searchData, data]);
+
+  // 로딩 상태
+  const transactionsLoading = searchActive ? searchLoading : isLoading;
 
   // 선택된 카테고리의 총 금액
   const categoryTotal = useMemo(() => {
@@ -240,11 +266,23 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* 공통 헤더 + 카테고리 필터 통합 sticky 영역 */}
+      {/* 공통 헤더 + 검색바 + 카테고리 필터 통합 sticky 영역 */}
       <div className="sticky top-0 z-40 bg-white">
         <SharedHeader />
 
-        {/* 카테고리 필터 영역 */}
+        {/* 검색바 영역 */}
+        <div className="border-b border-slate-100 px-4 py-2">
+          <div className="max-w-lg mx-auto">
+            <SearchBar
+              filters={searchFilters}
+              onFiltersChange={setSearchFilters}
+              onOpenFilterPanel={() => setFilterPanelOpen(true)}
+            />
+          </div>
+        </div>
+
+        {/* 카테고리 필터 영역 (검색 비활성화 시에만 표시) */}
+        {!searchActive && (
         <div className="border-b border-slate-100 px-4 py-3">
           <div className="max-w-lg mx-auto">
             {/* 카테고리 필터 */}
@@ -283,30 +321,33 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+        )}
       </div>
 
-      {/* 요약 카드 */}
-      {!selectedCategory ? (
-        <div className="px-5 py-3">
-          <div className="max-w-lg mx-auto">
-            <SummaryCard
-              transactions={allData?.data || []}
-              prevMonthTransactions={prevMonthData?.data || []}
-            />
-          </div>
-        </div>
-      ) : (
-        categoryTotal > 0 && (
+      {/* 요약 카드 (검색 비활성화 시에만 표시) */}
+      {!searchActive && (
+        !selectedCategory ? (
           <div className="px-5 py-3">
-            <div className="max-w-lg mx-auto bg-white rounded-2xl p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-[#3182F6]">{selectedCategory}</span>
-                <span className="text-lg font-bold tracking-tight text-[#3182F6]">
-                  {formatNumber(categoryTotal)}원
-                </span>
-              </div>
+            <div className="max-w-lg mx-auto">
+              <SummaryCard
+                transactions={allData?.data || []}
+                prevMonthTransactions={prevMonthData?.data || []}
+              />
             </div>
           </div>
+        ) : (
+          categoryTotal > 0 && (
+            <div className="px-5 py-3">
+              <div className="max-w-lg mx-auto bg-white rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-[#3182F6]">{selectedCategory}</span>
+                  <span className="text-lg font-bold tracking-tight text-[#3182F6]">
+                    {formatNumber(categoryTotal)}원
+                  </span>
+                </div>
+              </div>
+            </div>
+          )
         )
       )}
 
@@ -315,7 +356,7 @@ export default function HomePage() {
         <div className="max-w-lg mx-auto">
           <TransactionList
             transactions={transactions}
-            isLoading={isLoading}
+            isLoading={transactionsLoading}
             onLongPress={handleLongPress}
             onDelete={handleDelete}
             onUploadClick={handleUploadClick}
@@ -360,6 +401,14 @@ export default function HomePage() {
       {editFlow.similarModalProps && (
         <SimilarTransactionsModal {...editFlow.similarModalProps} />
       )}
+
+      {/* 검색 필터 패널 */}
+      <FilterPanel
+        open={filterPanelOpen}
+        onOpenChange={setFilterPanelOpen}
+        filters={searchFilters}
+        onApply={setSearchFilters}
+      />
     </div>
   );
 }

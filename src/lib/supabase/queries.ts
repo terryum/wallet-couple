@@ -1006,3 +1006,121 @@ export async function createManualEntries(
     return { data: null, error: String(err) };
   }
 }
+
+// ============================================
+// 검색 관련 쿼리
+// ============================================
+
+import type { TransactionSearchParams, SearchResult } from '@/types';
+
+/**
+ * 거래 내역 검색 (고급 필터링)
+ * - 기간, 이용처, 카테고리(복수), 금액범위, 결제수단(복수) 필터 지원
+ */
+export async function searchTransactions(
+  params: TransactionSearchParams
+): Promise<QueryResult<SearchResult>> {
+  try {
+    const {
+      startDate,
+      endDate,
+      merchantSearch,
+      categories,
+      sourceTypes,
+      amountMin,
+      amountMax,
+      owner,
+      transactionType = 'expense',
+      sort = 'date_desc',
+      limit = 100,
+      offset = 0,
+    } = params;
+
+    let query = supabase
+      .from('transactions')
+      .select('*', { count: 'exact' })
+      .eq('is_deleted', false);
+
+    // 기간 필터
+    if (startDate) {
+      query = query.gte('transaction_date', startDate);
+    }
+    if (endDate) {
+      query = query.lte('transaction_date', endDate);
+    }
+
+    // 이용처 검색 (ILIKE - 대소문자 무시)
+    if (merchantSearch && merchantSearch.trim()) {
+      query = query.ilike('merchant_name', `%${merchantSearch.trim()}%`);
+    }
+
+    // 복수 카테고리 필터 (IN)
+    if (categories && categories.trim()) {
+      const categoryList = categories.split(',').map(c => c.trim());
+      query = query.in('category', categoryList);
+    }
+
+    // 복수 결제수단 필터 (IN)
+    if (sourceTypes && sourceTypes.trim()) {
+      const sourceList = sourceTypes.split(',').map(s => s.trim());
+      query = query.in('source_type', sourceList);
+    }
+
+    // 금액 범위 필터
+    if (amountMin !== undefined && amountMin > 0) {
+      query = query.gte('amount', amountMin);
+    }
+    if (amountMax !== undefined && amountMax > 0) {
+      query = query.lte('amount', amountMax);
+    }
+
+    // Owner 필터
+    if (owner) {
+      query = query.eq('owner', owner);
+    }
+
+    // 거래 유형 필터
+    if (transactionType !== 'all') {
+      query = query.eq('transaction_type', transactionType);
+    }
+
+    // 정렬 적용
+    switch (sort) {
+      case 'date_asc':
+        query = query.order('transaction_date', { ascending: true });
+        break;
+      case 'date_desc':
+        query = query.order('transaction_date', { ascending: false });
+        break;
+      case 'amount_asc':
+        query = query.order('amount', { ascending: true });
+        break;
+      case 'amount_desc':
+        query = query.order('amount', { ascending: false });
+        break;
+    }
+
+    // 페이지네이션
+    query = query.range(offset, offset + limit - 1);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      return { data: null, error: error.message };
+    }
+
+    const totalCount = count || 0;
+    const hasMore = offset + limit < totalCount;
+
+    return {
+      data: {
+        data: data as Transaction[],
+        count: totalCount,
+        hasMore,
+      },
+      error: null,
+    };
+  } catch (err) {
+    return { data: null, error: String(err) };
+  }
+}
