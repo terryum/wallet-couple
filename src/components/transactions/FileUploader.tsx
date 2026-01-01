@@ -339,6 +339,8 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
 
     let totalInserted = 0;
     let totalDuplicates = 0;
+    let successFileCount = 0;    // 성공적으로 업로드된 파일 수
+    let duplicateFileCount = 0;  // 중복 파일 수 (0건 삽입)
     let hasError = false;
     let cancelled = false;
 
@@ -435,8 +437,16 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
 
       // 결과 집계
       if (result?.success) {
-        totalInserted += result.inserted || 0;
-        totalDuplicates += result.duplicates || 0;
+        const inserted = result.inserted || 0;
+        const duplicates = result.duplicates || 0;
+        totalInserted += inserted;
+        totalDuplicates += duplicates;
+
+        if (inserted > 0) {
+          successFileCount++;
+        } else {
+          duplicateFileCount++;  // 0건 삽입 = 중복 파일
+        }
       } else if (!result?.needPassword) {
         hasError = true;
       }
@@ -457,13 +467,30 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     queryClient.invalidateQueries({ queryKey: ['billing-comparison'] });
 
-    // 결과 메시지
+    // 결과 메시지 생성
+    const totalProcessedFiles = successFileCount + duplicateFileCount;
+    let message = '';
+
+    if (totalInserted > 0) {
+      message = `${totalProcessedFiles}개 파일에서 ${totalInserted}건 업로드`;
+      const extras: string[] = [];
+      if (duplicateFileCount > 0) {
+        extras.push(`중복파일 ${duplicateFileCount}개`);
+      }
+      if (totalDuplicates > 0) {
+        extras.push(`중복내역 ${totalDuplicates}건`);
+      }
+      if (extras.length > 0) {
+        message += ` (${extras.join(', ')})`;
+      }
+    } else if (totalProcessedFiles > 0) {
+      message = `${totalProcessedFiles}개 파일 모두 중복 (추가된 항목 없음)`;
+    } else {
+      message = '추가된 항목이 없습니다.';
+    }
+
     setIsError(hasError && totalInserted === 0);
-    setResultMessage(
-      totalInserted > 0
-        ? `${totalInserted}건 추가 완료${totalDuplicates > 0 ? ` (중복 ${totalDuplicates}건 제외)` : ''}`
-        : '추가된 항목이 없습니다.'
-    );
+    setResultMessage(message);
     setShowResult(true);
 
     // 성공 시 업로드 결과 팝업 표시 준비 - ref를 사용하여 최신 상태 참조
