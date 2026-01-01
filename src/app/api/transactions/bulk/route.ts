@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase/client';
 import { extractPattern } from '@/lib/classifier';
+import { saveCategoryMapping } from '@/lib/services/mappings.service';
 import type { Category } from '@/types';
 
 interface BulkUpdateRequest {
@@ -14,6 +15,7 @@ interface BulkUpdateRequest {
   merchant_name?: string;
   // 이용처명 매핑 저장 관련
   save_mapping?: boolean;
+  save_category_mapping?: boolean;
   original_merchant?: string;
 }
 
@@ -26,7 +28,14 @@ interface BulkUpdateResponse {
 export async function PATCH(request: NextRequest): Promise<NextResponse> {
   try {
     const body: BulkUpdateRequest = await request.json();
-    const { ids, category, merchant_name, save_mapping, original_merchant } = body;
+    const {
+      ids,
+      category,
+      merchant_name,
+      save_mapping,
+      save_category_mapping,
+      original_merchant,
+    } = body;
 
     if (!ids || ids.length === 0) {
       return NextResponse.json(

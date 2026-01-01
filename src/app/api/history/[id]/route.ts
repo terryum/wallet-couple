@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { undoActionsFromHistory } from '@/lib/supabase/queries';
+import { undoActionsFromHistory } from '@/lib/repositories/action-history.repo';
 
 /**
  * POST /api/history/[id]

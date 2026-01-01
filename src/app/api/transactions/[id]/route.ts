@@ -11,11 +11,14 @@ import {
   getTransactionById,
   updateTransaction,
   deleteTransaction,
-  createActionHistory,
 } from '@/lib/supabase/queries';
+import { createActionHistory } from '@/lib/repositories/action-history.repo';
 import type { UpdateTransactionDto, Transaction } from '@/types';
 import { isValidCategory } from '@/lib/utils/validation';
 import { formatNumber } from '@/lib/utils/format';
+import { saveCategoryMapping } from '@/lib/services/mappings.service';
+import { extractPattern } from '@/lib/classifier';
+import { supabase } from '@/lib/supabase/client';
 
 /** 변경 내용을 상세하게 설명하는 함수 */
 function generateChangeDescription(
@@ -190,6 +193,39 @@ export async function PATCH(
       );
     }
 
+    if (previousData) {
+      const merchantChanged = updates.merchant_name && updates.merchant_name !== previousData.merchant_name;
+      const categoryChanged = updates.category && updates.category !== previousData.category;
+
+      if (merchantChanged) {
+        try {
+          const pattern = extractPattern(previousData.merchant_name);
+          await supabase
+            .from('merchant_name_mappings')
+            .upsert(
+              {
+                original_pattern: pattern,
+                preferred_name: updates.merchant_name,
+                example_original: previousData.merchant_name,
+                match_count: 1,
+              },
+              { onConflict: 'original_pattern' }
+            );
+        } catch (mappingError) {
+          console.error('???? ?? ?? ??:', mappingError);
+        }
+      }
+
+      if (categoryChanged) {
+        const targetMerchant = (updates.merchant_name as string | undefined) || previousData.merchant_name;
+        try {
+          await saveCategoryMapping(targetMerchant, updates.category as any);
+        } catch (mappingError) {
+          console.error('???? ?? ?? ??:', mappingError);
+        }
+      }
+    }
+
     // 히스토리 기록 (상세 변경 내용 포함)
     if (previousData) {
       const isDelete = updates.is_deleted === true;
@@ -248,6 +284,39 @@ export async function DELETE(
         { success: false, error: result.error },
         { status: 500 }
       );
+    }
+
+    if (previousData) {
+      const merchantChanged = updates.merchant_name && updates.merchant_name !== previousData.merchant_name;
+      const categoryChanged = updates.category && updates.category !== previousData.category;
+
+      if (merchantChanged) {
+        try {
+          const pattern = extractPattern(previousData.merchant_name);
+          await supabase
+            .from('merchant_name_mappings')
+            .upsert(
+              {
+                original_pattern: pattern,
+                preferred_name: updates.merchant_name,
+                example_original: previousData.merchant_name,
+                match_count: 1,
+              },
+              { onConflict: 'original_pattern' }
+            );
+        } catch (mappingError) {
+          console.error('???? ?? ?? ??:', mappingError);
+        }
+      }
+
+      if (categoryChanged) {
+        const targetMerchant = (updates.merchant_name as string | undefined) || previousData.merchant_name;
+        try {
+          await saveCategoryMapping(targetMerchant, updates.category as any);
+        } catch (mappingError) {
+          console.error('???? ?? ?? ??:', mappingError);
+        }
+      }
     }
 
     // 히스토리 기록

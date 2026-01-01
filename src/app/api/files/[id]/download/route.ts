@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUploadedFileById } from '@/lib/supabase/queries';
+import { fetchUploadedFileById } from '@/lib/services/files.service';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -24,7 +24,7 @@ export async function GET(
       );
     }
 
-    const result = await getUploadedFileById(id);
+    const result = await fetchUploadedFileById(id);
 
     if (result.error || !result.data) {
       return NextResponse.json(

@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +27,7 @@ interface EditModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction: Transaction | null;
+  modalId?: string;
   /** 새 거래 추가 시 사용할 owner (transaction이 null일 때 필요) */
   owner?: Owner;
   /** 이용처 또는 카테고리 변경 시 콜백 (둘 다 변경되면 함께 전달) */
@@ -42,6 +44,7 @@ export function EditModal({
   open,
   onOpenChange,
   transaction,
+  modalId = 'edit-modal',
   owner,
   onFieldsChanged,
 }: EditModalProps) {
@@ -50,7 +53,7 @@ export function EditModal({
   useModalBackHandler({
     isOpen: open,
     onClose: handleClose,
-    modalId: 'edit-modal',
+    modalId,
   });
 
   // 생성 모드 여부
@@ -211,6 +214,9 @@ export function EditModal({
           <DialogTitle className="text-lg font-bold tracking-tight text-slate-900">
             {isCreateMode ? '내역 추가' : '상세 내역'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            거래 내역을 추가하거나 수정 및 삭제합니다.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">

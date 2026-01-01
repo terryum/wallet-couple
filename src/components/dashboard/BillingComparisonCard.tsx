@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useBillingComparison, type MonthlyBilling } from '@/hooks/useBillingComparison';
+import { useBillingComparison, type BillingComparisonRow } from '@/hooks/useBillingComparison';
 import { formatCurrency } from '@/lib/utils/format';
 
 interface BillingComparisonCardProps {
@@ -85,15 +85,12 @@ export function BillingComparisonCard({ months = 12 }: BillingComparisonCardProp
 }
 
 interface MonthRowProps {
-  data: MonthlyBilling;
+  data: BillingComparisonRow;
   isExpanded: boolean;
   onToggle: () => void;
 }
 
 function MonthRow({ data, isExpanded, onToggle }: MonthRowProps) {
-  const [year, month] = data.month.split('-');
-  const displayMonth = `${year}.${month}`;
-
   return (
     <div className="border border-slate-100 rounded-lg overflow-hidden">
       {/* 월별 요약 행 */}
@@ -107,15 +104,12 @@ function MonthRow({ data, isExpanded, onToggle }: MonthRowProps) {
           ) : (
             <ChevronDown className="w-4 h-4 text-slate-400" />
           )}
-          <span className="text-xs text-slate-400">{displayMonth}</span>
+          <span className="text-xs text-slate-400">{data.monthLabel}</span>
         </div>
 
         {/* 청구금액 */}
         <span className="text-sm text-slate-700 w-24 text-right">
-          {data.billing_amount > 0
-            ? formatCurrency(data.billing_amount)
-            : '-'
-          }
+          {data.hasBilling ? formatCurrency(data.billing_amount) : '-'}
         </span>
         {/* 이용금액 */}
         <span className="text-sm text-slate-700 w-24 text-right">
@@ -133,10 +127,7 @@ function MonthRow({ data, isExpanded, onToggle }: MonthRowProps) {
             >
               <span className="text-slate-600 pl-6 flex-1">{card.source_type}</span>
               <span className="text-slate-600 w-24 text-right">
-                {card.billing_amount > 0
-                  ? formatCurrency(card.billing_amount)
-                  : '-'
-                }
+                {card.hasBilling ? formatCurrency(card.billing_amount) : '-'}
               </span>
               <span className="text-slate-600 w-24 text-right">
                 {formatCurrency(card.usage_amount)}

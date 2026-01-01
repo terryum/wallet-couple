@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
-import { getManualEntries } from '@/lib/supabase/queries';
+import { getManualEntries } from '@/lib/repositories/manual-entries.repo';
 import { MANUAL_ENTRY_HEADERS } from '@/lib/loaders/manual';
 import { ALL_CATEGORIES } from '@/types';
 import type { Owner } from '@/types';

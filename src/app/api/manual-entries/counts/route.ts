@@ -4,7 +4,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { getManualEntryCount } from '@/lib/supabase/queries';
+import { getManualEntryCount } from '@/lib/repositories/manual-entries.repo';
 
 export async function GET(): Promise<NextResponse> {
   try {

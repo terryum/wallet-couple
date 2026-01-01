@@ -5,14 +5,16 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { useResetAllData } from '@/hooks/useFiles';
+import { useModalBackHandler } from '@/hooks/useModalBackHandler';
 
 interface ResetConfirmDialogProps {
   open: boolean;
@@ -22,6 +24,16 @@ interface ResetConfirmDialogProps {
 export function ResetConfirmDialog({ open, onOpenChange }: ResetConfirmDialogProps) {
   const [preserveMappings, setPreserveMappings] = useState(true);
   const { mutate: resetAll, isPending: isResetting } = useResetAllData();
+
+  const handleClose = useCallback(() => {
+    onOpenChange(false);
+  }, [onOpenChange]);
+
+  useModalBackHandler({
+    isOpen: open,
+    onClose: handleClose,
+    modalId: 'reset-confirm-dialog',
+  });
 
   const handleResetConfirm = () => {
     resetAll(preserveMappings, {
@@ -36,6 +48,9 @@ export function ResetConfirmDialog({ open, onOpenChange }: ResetConfirmDialogPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100%-2rem)] max-w-sm mx-auto rounded-2xl">
         <DialogTitle className="sr-only">전체 초기화 확인</DialogTitle>
+        <DialogDescription className="sr-only">
+          모든 거래와 업로드 파일을 삭제하고 초기 상태로 되돌립니다.
+        </DialogDescription>
         <div className="flex flex-col items-center text-center pt-4">
           <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
             <AlertTriangle className="w-8 h-8 text-red-500" />
@@ -64,7 +79,7 @@ export function ResetConfirmDialog({ open, onOpenChange }: ResetConfirmDialogPro
 
           <div className="flex gap-3 w-full">
             <button
-              onClick={() => onOpenChange(false)}
+              onClick={handleClose}
               disabled={isResetting}
               className="flex-1 py-3 text-sm font-medium text-slate-700 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
             >

@@ -4,29 +4,15 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase/client';
-import { saveManualMapping } from '@/lib/classifier';
+import {
+  fetchAllMappings,
+  saveCategoryMapping,
+  updateCategoryMappingWithHistory,
+  updateMerchantMappingWithHistory,
+  deleteMappingByType,
+} from '@/lib/services/mappings.service';
 import { isValidCategory } from '@/lib/utils/validation';
 import type { Category } from '@/types';
-
-/** 카테고리 매핑 타입 */
-interface CategoryMapping {
-  id: string;
-  pattern: string;
-  category: Category;
-  source: 'ai' | 'manual';
-  match_count: number;
-  created_at: string;
-}
-
-/** 이용처명 매핑 타입 */
-interface MerchantNameMapping {
-  id: string;
-  original_pattern: string;
-  preferred_name: string;
-  match_count: number;
-  created_at: string;
-}
 
 /**
  * GET /api/mappings
@@ -34,28 +20,11 @@ interface MerchantNameMapping {
  */
 export async function GET(): Promise<NextResponse> {
   try {
-    // 카테고리 매핑 조회 (최신순 정렬)
-    const { data: categoryMappings, error: catError } = await supabase
-      .from('category_mappings')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const result = await fetchAllMappings();
 
-    if (catError) {
+    if (result.error || !result.data) {
       return NextResponse.json(
-        { success: false, error: catError.message },
-        { status: 500 }
-      );
-    }
-
-    // 이용처명 매핑 조회 (최신순 정렬)
-    const { data: merchantMappings, error: merchantError } = await supabase
-      .from('merchant_name_mappings')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (merchantError) {
-      return NextResponse.json(
-        { success: false, error: merchantError.message },
+        { success: false, error: result.error || '매핑 조회 실패' },
         { status: 500 }
       );
     }
@@ -63,8 +32,8 @@ export async function GET(): Promise<NextResponse> {
     return NextResponse.json({
       success: true,
       data: {
-        categoryMappings: (categoryMappings || []) as CategoryMapping[],
-        merchantMappings: (merchantMappings || []) as MerchantNameMapping[],
+        categoryMappings: result.data.categoryMappings,
+        merchantMappings: result.data.merchantMappings,
       },
     });
   } catch (err) {
@@ -103,7 +72,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    await saveManualMapping(merchantName, category);
+    await saveCategoryMapping(merchantName, category);
 
     return NextResponse.json({
       success: true,
@@ -150,35 +119,12 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         );
       }
 
-      // 이전 데이터 조회
-      const { data: prevData } = await supabase
-        .from('category_mappings')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      const { error } = await supabase
-        .from('category_mappings')
-        .update({ category, source: 'manual' })
-        .eq('id', id);
-
-      if (error) {
+      const updateResult = await updateCategoryMappingWithHistory(id, category);
+      if (updateResult.error) {
         return NextResponse.json(
-          { success: false, error: error.message },
+          { success: false, error: updateResult.error },
           { status: 500 }
         );
-      }
-
-      // action_history에 기록
-      if (prevData && prevData.category !== category) {
-        await supabase.from('action_history').insert({
-          action_type: 'update',
-          entity_type: 'mapping',
-          entity_id: id,
-          description: `카테고리 매핑 변경: ${prevData.pattern} (${prevData.category} → ${category})`,
-          previous_data: { category: prevData.category, source: prevData.source },
-          new_data: { category, source: 'manual' },
-        });
       }
     } else if (type === 'merchant') {
       if (!preferredName) {
@@ -188,35 +134,12 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
         );
       }
 
-      // 이전 데이터 조회
-      const { data: prevData } = await supabase
-        .from('merchant_name_mappings')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      const { error } = await supabase
-        .from('merchant_name_mappings')
-        .update({ preferred_name: preferredName })
-        .eq('id', id);
-
-      if (error) {
+      const updateResult = await updateMerchantMappingWithHistory(id, preferredName);
+      if (updateResult.error) {
         return NextResponse.json(
-          { success: false, error: error.message },
+          { success: false, error: updateResult.error },
           { status: 500 }
         );
-      }
-
-      // action_history에 기록
-      if (prevData && prevData.preferred_name !== preferredName) {
-        await supabase.from('action_history').insert({
-          action_type: 'update',
-          entity_type: 'mapping',
-          entity_id: id,
-          description: `이용처명 매핑 변경: ${prevData.original_pattern} (${prevData.preferred_name} → ${preferredName})`,
-          previous_data: { preferred_name: prevData.preferred_name },
-          new_data: { preferred_name: preferredName },
-        });
       }
     }
 
@@ -254,16 +177,10 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const tableName = type === 'category' ? 'category_mappings' : 'merchant_name_mappings';
-
-    const { error } = await supabase
-      .from(tableName)
-      .delete()
-      .eq('id', id);
-
-    if (error) {
+    const result = await deleteMappingByType(type, id);
+    if (result.error) {
       return NextResponse.json(
-        { success: false, error: error.message },
+        { success: false, error: result.error },
         { status: 500 }
       );
     }

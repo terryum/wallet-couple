@@ -19,24 +19,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatNumber, formatYearMonth } from '@/lib/utils/format';
 import { CategoryPopup } from './CategoryPopup';
 import { CATEGORY_COLORS, getCategoryColor } from '@/constants/chart';
-import { calculateCategoriesForPeriod } from '@/hooks/useCategoryCalculation';
+import {
+  calculateCategoriesForPeriod,
+  buildStackedBarChartData,
+  type StackedBarMonthData,
+} from '@/hooks/useCategoryCalculation';
 import type { Category } from '@/types';
 
-interface CategoryData {
-  category: Category;
-  total_amount: number;
-  count: number;
-}
-
-interface MonthData {
-  month: string;
-  total: number;
-  totalCount: number;
-  byCategory: CategoryData[];
-}
-
 interface StackedBarCardProps {
-  data: MonthData[];
+  data: StackedBarMonthData[];
   isLoading?: boolean;
   headerMonth?: string;
   // 하이라이트 동기화용
@@ -113,74 +104,7 @@ export function StackedBarCard({
 
   // 차트 데이터 생성
   const chartData = useMemo(() => {
-    if (filteredData.length === 0) return [];
-
-    return filteredData.map((month, index) => {
-      const monthLabel = `${parseInt(month.month.slice(5))}월`;
-      const result: Record<string, number | string> = {
-        month: monthLabel,
-        fullMonth: month.month, // YYYY-MM 전체 저장 (버그 수정)
-        total: month.total,
-        totalCount: month.totalCount,
-      };
-
-      // 전월 대비 전체 증감 계산
-      if (index > 0) {
-        const prevTotal = filteredData[index - 1].total;
-        result.change = month.total - prevTotal;
-      } else {
-        result.change = 0; // 첫 번째 월은 비교 대상 없음
-      }
-
-      // 모든 카테고리 초기값 0
-      for (const cat of topCategories) {
-        result[cat] = 0;
-        result[`${cat}_count`] = 0;
-      }
-
-      // 카테고리별 금액 및 건수
-      let etcTotal = 0;
-      let etcCount = 0;
-      for (const cat of month.byCategory) {
-        const catName = cat.category as string;
-        if (topCategories.includes(catName) && catName !== 'etc.') {
-          result[catName] = cat.total_amount;
-          result[`${catName}_count`] = cat.count;
-        } else {
-          etcTotal += cat.total_amount;
-          etcCount += cat.count;
-        }
-      }
-      result['etc.'] = etcTotal;
-      result['etc._count'] = etcCount;
-
-      // 카테고리별 전월 대비 증감 계산
-      if (index > 0) {
-        const prevMonth = filteredData[index - 1];
-        for (const cat of topCategories) {
-          if (cat === 'etc.') {
-            // etc. 카테고리는 이전 월의 etc. 합계와 비교
-            let prevEtcTotal = 0;
-            for (const prevCat of prevMonth.byCategory) {
-              if (!topCategories.includes(prevCat.category)) {
-                prevEtcTotal += prevCat.total_amount;
-              }
-            }
-            result[`${cat}_change`] = etcTotal - prevEtcTotal;
-          } else {
-            const prevCatData = prevMonth.byCategory.find((c) => c.category === cat);
-            const prevAmount = prevCatData?.total_amount || 0;
-            result[`${cat}_change`] = (result[cat] as number) - prevAmount;
-          }
-        }
-      } else {
-        for (const cat of topCategories) {
-          result[`${cat}_change`] = 0;
-        }
-      }
-
-      return result;
-    });
+    return buildStackedBarChartData(filteredData, topCategories);
   }, [filteredData, topCategories]);
 
   // 선택된 월 데이터 (라벨이 아닌 fullMonth로 매칭)

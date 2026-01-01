@@ -28,25 +28,29 @@ interface SimilarTransactionsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   originalTransaction: Transaction | null;
+  modalId?: string;
   // 카테고리 변경
   newCategory?: Category | null;
   // 이용처명 변경
   newMerchantName?: string | null;
+  onBulkUpdated?: () => void;
 }
 
 export function SimilarTransactionsModal({
   open,
   onOpenChange,
   originalTransaction,
+  modalId = 'similar-transactions-modal',
   newCategory,
   newMerchantName,
+  onBulkUpdated,
 }: SimilarTransactionsModalProps) {
   // 뒤로가기 버튼 처리
   const handleClose = useCallback(() => onOpenChange(false), [onOpenChange]);
   useModalBackHandler({
     isOpen: open,
     onClose: handleClose,
-    modalId: 'similar-transactions-modal',
+    modalId,
   });
 
   const queryClient = useQueryClient();
@@ -175,6 +179,8 @@ export function SimilarTransactionsModal({
         setIsCompleted(true);
         queryClient.invalidateQueries({ queryKey: ['transactions'] });
         queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+        queryClient.invalidateQueries({ queryKey: ['billing-comparison'] });
+        onBulkUpdated?.();
 
         setTimeout(() => {
           onOpenChange(false);
@@ -283,6 +289,7 @@ export function SimilarTransactionsModal({
                       <button
                         onClick={() => removeItem(tx.id)}
                         className="p-1 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 shrink-0"
+                        aria-label={`항목 제외: ${tx.merchant_name}`}
                       >
                         <X className="w-4 h-4" />
                       </button>

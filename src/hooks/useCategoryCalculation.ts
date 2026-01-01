@@ -146,3 +146,79 @@ export function calculateCategoriesForPeriod(
 
   return { topCategories, etcCategories };
 }
+
+export interface StackedBarMonthData {
+  month: string;
+  total: number;
+  totalCount: number;
+  byCategory: CategoryData[];
+}
+
+export function buildStackedBarChartData(
+  monthlyData: StackedBarMonthData[],
+  topCategories: string[]
+): Array<Record<string, number | string>> {
+  if (monthlyData.length === 0) return [];
+
+  return monthlyData.map((month, index) => {
+    const monthLabel = `${parseInt(month.month.slice(5))}월`;
+    const result: Record<string, number | string> = {
+      month: monthLabel,
+      fullMonth: month.month,
+      total: month.total,
+      totalCount: month.totalCount,
+    };
+
+    if (index > 0) {
+      const prevTotal = monthlyData[index - 1].total;
+      result.change = month.total - prevTotal;
+    } else {
+      result.change = 0;
+    }
+
+    for (const cat of topCategories) {
+      result[cat] = 0;
+      result[`${cat}_count`] = 0;
+    }
+
+    let etcTotal = 0;
+    let etcCount = 0;
+    for (const cat of month.byCategory) {
+      const catName = cat.category as string;
+      if (topCategories.includes(catName) && catName !== 'etc.') {
+        result[catName] = cat.total_amount;
+        result[`${catName}_count`] = cat.count;
+      } else {
+        etcTotal += cat.total_amount;
+        etcCount += cat.count;
+      }
+    }
+    result['etc.'] = etcTotal;
+    result['etc._count'] = etcCount;
+
+    if (index > 0) {
+      const prevMonth = monthlyData[index - 1];
+      for (const cat of topCategories) {
+        if (cat === 'etc.') {
+          let prevEtcTotal = 0;
+          for (const prevCat of prevMonth.byCategory) {
+            if (!topCategories.includes(prevCat.category)) {
+              prevEtcTotal += prevCat.total_amount;
+            }
+          }
+          result[`${cat}_change`] = etcTotal - prevEtcTotal;
+        } else {
+          const prevCatData = prevMonth.byCategory.find((c) => c.category === cat);
+          const prevAmount = prevCatData?.total_amount || 0;
+          result[`${cat}_change`] = (result[cat] as number) - prevAmount;
+        }
+      }
+    } else {
+      for (const cat of topCategories) {
+        result[`${cat}_change`] = 0;
+      }
+    }
+
+    return result;
+  });
+}
