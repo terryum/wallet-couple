@@ -18,6 +18,7 @@
 - 직접입력
 
 ### 최근 추가된 기능
+- Supabase 환경변수 인식 개선 (SUPABASE_ANON_KEY 지원)
 - 업로드 결과 메시지 개선 (파일 수/중복 정보 표시)
 - 패턴 저장 체크박스 (일괄 수정 시 선택적 저장)
 - 사용자 커스텀 설정 중앙 관리 시스템 도입
@@ -41,7 +42,7 @@ Supabase (PostgreSQL + RLS)
 |---------|------|
 | `src/lib/ingestion/` | 청구월 추출, 분류 준비, 거래 변환 |
 | `src/lib/classifier/` | AI 기반 카테고리 분류 |
-| `src/lib/customizations/` | 사용자 커스텀 설정 레지스트리 (NEW) |
+| `src/lib/customizations/` | 사용자 커스텀 설정 레지스트리 |
 | `src/lib/services/` | 비즈니스 로직 |
 | `src/lib/repositories/` | DB 접근 래퍼 |
 | `src/hooks/` | React Query 훅 |
@@ -68,7 +69,7 @@ npx tsc --noEmit
 
 ### 환경 변수 (.env)
 - `SUPABASE_URL` - Supabase 프로젝트 URL
-- `SUPABASE_ANON_KEY` - Supabase anon key
+- `SUPABASE_ANON_KEY` 또는 `SUPABASE_KEY` - Supabase anon key
 - `ANTHROPIC_API_KEY` - Claude API 키
 
 ## 5) 주요 문서
@@ -80,7 +81,8 @@ npx tsc --noEmit
 
 ## 6) 최근 변경 이력
 
-### 2026-01-01
+### 2026-01-01 (최신)
+- SUPABASE_ANON_KEY 환경변수 인식 추가 (client.ts 수정)
 - 사용자 커스텀 설정 중앙 관리 시스템 도입
   - `src/lib/customizations/` 모듈 추가
   - 새 커스텀 기능 추가 시 registry.ts에 등록만 하면 초기화에 자동 포함
