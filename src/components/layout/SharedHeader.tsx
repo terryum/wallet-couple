@@ -1,6 +1,7 @@
 /**
  * 공통 헤더 컴포넌트
  * 월 선택, Owner 선택, 사용자 설정 드롭다운 포함
+ * Design System: 토스 스타일 블루 기반
  */
 
 'use client';
@@ -11,6 +12,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { formatYearMonth } from '@/lib/utils/format';
 import { SettingsDropdown } from '@/components/settings';
 import { FileUploader, type FileUploaderRef } from '@/components/transactions';
+import { owner } from '@/constants/colors';
 
 export function SharedHeader() {
   const fileUploaderRef = useRef<FileUploaderRef>(null);
@@ -62,9 +64,10 @@ export function SharedHeader() {
             onClick={() => setSelectedOwner('husband')}
             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
               selectedOwner === 'husband'
-                ? 'bg-blue-500 text-white'
+                ? 'text-white'
                 : 'bg-slate-100 text-slate-500'
             }`}
+            style={selectedOwner === 'husband' ? { backgroundColor: owner.husband } : undefined}
           >
             남편
           </button>
@@ -72,9 +75,10 @@ export function SharedHeader() {
             onClick={() => setSelectedOwner('wife')}
             className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
               selectedOwner === 'wife'
-                ? 'bg-pink-500 text-white'
+                ? 'text-white'
                 : 'bg-slate-100 text-slate-500'
             }`}
+            style={selectedOwner === 'wife' ? { backgroundColor: owner.wife } : undefined}
           >
             아내
           </button>

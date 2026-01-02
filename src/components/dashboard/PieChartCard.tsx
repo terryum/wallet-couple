@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatNumber, formatYearMonth } from '@/lib/utils/format';
 import { CategoryPopup } from './CategoryPopup';
 import { CATEGORY_COLORS, getCategoryColor } from '@/constants/chart';
+import { transaction } from '@/constants/colors';
 import { useCategoryCalculation } from '@/hooks/useCategoryCalculation';
 import type { Category, TransactionType } from '@/types';
 
@@ -186,11 +187,14 @@ export function PieChartCard({
               {formatYearMonth(month)} {typeLabel} 비중
             </CardTitle>
             {insight && (
-              <span className={`text-sm ${
-                isIncome
-                  ? (insight.isUp ? 'text-[#3182F6]' : 'text-red-500')  // 소득: 증가=파랑, 감소=빨강
-                  : (insight.isUp ? 'text-red-500' : 'text-[#3182F6]')  // 지출: 증가=빨강, 감소=파랑
-              }`}>
+              <span
+                className="text-sm"
+                style={{
+                  color: isIncome
+                    ? (insight.isUp ? transaction.income : transaction.expense)  // 소득: 증가=초록, 감소=빨강
+                    : (insight.isUp ? transaction.expense : transaction.income)  // 지출: 증가=빨강, 감소=초록
+                }}
+              >
                 {insight.text}
               </span>
             )}

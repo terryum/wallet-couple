@@ -1,38 +1,16 @@
 /**
  * 차트 관련 공유 상수
+ * 색상은 colors.ts에서 중앙 관리
  */
 
 import type { Category } from '@/types';
+import {
+  chartColors,
+  getCategoryColor as getColor,
+} from './colors';
 
-/** 카테고리별 색상 */
-export const CATEGORY_COLORS: Record<string, string> = {
-  // 지출 카테고리
-  식료품: '#22c55e',
-  '외식/커피': '#f97316',
-  쇼핑: '#ec4899',
-  관리비: '#64748b',
-  '통신/교통': '#3b82f6',
-  육아: '#eab308',
-  '병원/미용': '#a855f7',
-  기존할부: '#ef4444',
-  대출이자: '#dc2626',
-  양육비: '#14b8a6',
-  세금: '#7c3aed',
-  여행: '#06b6d4',
-  부모님: '#f59e0b',
-  '친구/동료': '#6366f1',
-  '경조사/선물': '#f43f5e',
-  '가전/가구': '#10b981',
-  기타: '#9ca3af',
-  'etc.': '#9ca3af',
-  // 소득 카테고리
-  급여: '#2563eb',       // 파란색 (메인 소득)
-  상여: '#7c3aed',       // 보라색
-  '정부/환급': '#059669', // 에메랄드
-  '강연/도서': '#ea580c', // 주황색
-  금융소득: '#0891b2',   // 청록색
-  기타소득: '#64748b',   // 슬레이트
-};
+/** 카테고리별 색상 (colors.ts에서 import) */
+export const CATEGORY_COLORS = chartColors;
 
 /** 최소 표시 카테고리 수 */
 export const MIN_CATEGORIES = 5;
@@ -41,10 +19,10 @@ export const MIN_CATEGORIES = 5;
 export const MAX_CATEGORIES = 7;
 
 /**
- * 카테고리 색상 반환
+ * 카테고리 색상 반환 (colors.ts 위임)
  */
 export function getCategoryColor(category: string): string {
-  return CATEGORY_COLORS[category] || CATEGORY_COLORS['기타'];
+  return getColor(category);
 }
 
 /**

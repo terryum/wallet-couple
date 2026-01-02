@@ -30,6 +30,7 @@
 | Charts | Recharts |
 | AI | Anthropic Claude API |
 | Testing | Vitest (169개 테스트) |
+| Design System | 토스 스타일 블루 기반 (`colors.ts`) |
 
 ## 명령어
 
@@ -67,13 +68,18 @@ src/
 │   │   ├── classify/       # 재분류 API
 │   │   ├── mappings/       # 매핑 관리 API
 │   │   └── transactions/   # CRUD API
-│   ├── dashboard/          # 분석 화면
-│   └── page.tsx            # 내역 화면 (메인)
+│   ├── dashboard/          # 지출 분석 화면
+│   ├── income/             # 소득 내역 + 분석
+│   └── page.tsx            # 지출 내역 (메인)
 ├── components/
-│   ├── dashboard/          # 차트 컴포넌트
-│   ├── transactions/       # 거래 관련 컴포넌트
+│   ├── dashboard/          # 차트 컴포넌트 (DashboardPageContent)
+│   ├── transactions/       # 거래 컴포넌트 (TransactionPageContent)
+│   ├── layout/             # 공통 레이아웃 (SharedHeader, SharedBottomNav)
 │   ├── settings/           # 설정 컴포넌트
 │   └── ui/                 # shadcn/ui
+├── constants/              # 상수 정의
+│   ├── colors.ts           # 디자인 시스템 색상 (핵심)
+│   └── chart.ts            # 차트 관련 상수
 ├── hooks/                  # React Query 훅
 ├── lib/
 │   ├── classifier/         # AI 카테고리 분류

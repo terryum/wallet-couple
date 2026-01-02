@@ -1,16 +1,19 @@
 /**
  * 공통 하단 네비게이션 컴포넌트
  * 4탭 구조: 지출 | 소득 | 지출분석 | 소득분석
+ * Design System: 토스 스타일 블루 기반
  */
 
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart2, List, TrendingDown, TrendingUp } from 'lucide-react';
+import { BarChart2, TrendingDown, TrendingUp } from 'lucide-react';
+import { transaction } from '@/constants/colors';
 
-const EXPENSE_COLOR = '#EF4444'; // 빨강
-const INCOME_COLOR = '#16A34A';  // 녹색
+// 거래 유형별 색상 (colors.ts에서 중앙 관리)
+const EXPENSE_COLOR = transaction.expense; // #FF5252
+const INCOME_COLOR = transaction.income;   // #00C853
 
 interface NavTab {
   href: string;

@@ -24,6 +24,7 @@ import {
   buildStackedBarChartData,
   type StackedBarMonthData,
 } from '@/hooks/useCategoryCalculation';
+import { brand, transaction } from '@/constants/colors';
 import type { Category, TransactionType } from '@/types';
 
 interface StackedBarCardProps {
@@ -482,7 +483,7 @@ export function StackedBarCard({
                         y={0}
                         dy={12}
                         textAnchor="middle"
-                        fill={isSelected ? '#3182F6' : '#94a3b8'}
+                        fill={isSelected ? brand.primary : '#94a3b8'}
                         fontSize={11}
                         fontWeight={isSelected ? 600 : 400}
                       >
@@ -592,7 +593,7 @@ export function StackedBarCard({
                               textAnchor="middle"
                               fontSize={9}
                               fontWeight={500}
-                              fill={isPositive ? '#ef4444' : '#3182F6'}
+                              fill={isPositive ? transaction.expense : transaction.income}
                             >
                               {isPositive ? '+' : '-'}{displayValue}만
                             </text>
@@ -606,70 +607,73 @@ export function StackedBarCard({
             </BarChart>
           </ResponsiveContainer>
 
-          {/* 필터 레전드 */}
+          {/* 필터 레전드 - PieChartCard와 동일한 순서 (선택된 월 기준 금액순 정렬) */}
           <div className="mt-3 flex flex-col items-center">
             {(() => {
-              // 첫줄 고정 순서: 전체, 외식/커피, 식료품, 가전/가구
-              const firstRowOrder = ['외식/커피', '식료품', '가전/가구'];
+              // 선택된 월(headerMonth)의 데이터에서 금액순 정렬 (PieChartCard와 동일)
+              const targetMonth = headerMonth || (chartData.length > 0 ? chartData[chartData.length - 1].fullMonth as string : null);
+              const monthData = targetMonth ? chartData.find((d) => d.fullMonth === targetMonth) : null;
 
               // 필터링된 카테고리 (etc.는 데이터가 있을 때만)
               const filteredCategories = topCategories.filter(
                 (cat) => cat !== 'etc.' || chartData.some((d) => (d[cat] as number) > 0)
               );
 
-              // 첫줄에 들어갈 카테고리 (존재하는 것만)
-              const firstRowCategories = firstRowOrder.filter((cat) => filteredCategories.includes(cat));
+              // 금액순으로 정렬 (선택된 월 기준)
+              const sortedCategories = [...filteredCategories].sort((a, b) => {
+                if (!monthData) return 0;
+                const amountA = (monthData[a] as number) || 0;
+                const amountB = (monthData[b] as number) || 0;
+                return amountB - amountA;
+              });
 
-              // 나머지 카테고리 (첫줄에 없는 것들)
-              const remainingCategories = filteredCategories.filter((cat) => !firstRowOrder.includes(cat));
+              // 4개씩 묶어서 행 생성 (첫 행: 전체 + 3개, 나머지: 4개씩)
+              const rows: Array<{ category: string | null; label: string }[]> = [];
 
-              // 첫줄: 전체 + 고정 순서 카테고리
-              const firstRow = [
+              // 첫 번째 행: 전체 + 처음 3개 카테고리
+              const firstRow: Array<{ category: string | null; label: string }> = [
                 { category: null, label: '전체' },
-                ...firstRowCategories.map((cat) => ({ category: cat, label: cat })),
+                ...sortedCategories.slice(0, 3).map((cat) => ({ category: cat, label: cat })),
               ];
+              rows.push(firstRow);
 
-              // 나머지 줄: 4개씩
-              const rows: Array<{ category: string | null; label: string }[]> = [firstRow];
-              for (let i = 0; i < remainingCategories.length; i += 4) {
+              // 나머지 행: 4개씩
+              const remaining = sortedCategories.slice(3);
+              for (let i = 0; i < remaining.length; i += 4) {
                 rows.push(
-                  remainingCategories.slice(i, i + 4).map((cat) => ({ category: cat, label: cat }))
+                  remaining.slice(i, i + 4).map((cat) => ({ category: cat, label: cat }))
                 );
               }
 
               return (
-                <div className="inline-flex flex-col items-start">
-                  {rows.map((row, rowIdx) => (
-                    <div key={rowIdx} className="flex justify-start gap-2 mb-2 last:mb-0">
-                      {row.map((item) => {
-                        const isActive = item.category === null
-                          ? !highlightedCategory
-                          : highlightedCategory === item.category;
-                        return (
-                          <button
-                            key={item.label}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleLegendClick(item.category ?? '');
-                            }}
-                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all ${
-                              isActive
-                                ? 'bg-slate-900 text-white'
-                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                            }`}
-                          >
-                            {item.category && (
-                              <div
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: getCategoryColor(item.category) }}
-                              />
-                            )}
-                            {item.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ))}
+                <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(4, auto)' }}>
+                  {rows.flat().map((item) => {
+                    const isActive = item.category === null
+                      ? !highlightedCategory
+                      : highlightedCategory === item.category;
+                    return (
+                      <button
+                        key={item.label}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleLegendClick(item.category ?? '');
+                        }}
+                        className={`flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all ${
+                          isActive
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                      >
+                        {item.category && (
+                          <div
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: getCategoryColor(item.category) }}
+                          />
+                        )}
+                        <span className="whitespace-nowrap">{item.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               );
             })()}

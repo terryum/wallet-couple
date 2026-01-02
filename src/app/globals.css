@@ -10,9 +10,31 @@
   --font-sans: var(--font-inter), var(--font-noto-sans-kr), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, monospace;
 
+  /* ============================================ */
+  /* Design System - 토스 스타일 블루 기반 */
+  /* ============================================ */
+
   /* Brand Color - Toss Blue */
   --color-brand: #3182F6;
+  --color-brand-hover: #1B64DA;
+  --color-brand-pressed: #0D4FC0;
   --color-brand-light: #E8F3FF;
+
+  /* Semantic Colors */
+  --color-success: #00C853;
+  --color-success-light: #E8F9EE;
+  --color-error: #FF5252;
+  --color-error-light: #FFEBEE;
+  --color-warning: #FFB300;
+  --color-warning-light: #FFF8E6;
+
+  /* Transaction Type Colors */
+  --color-expense: #FF5252;
+  --color-income: #00C853;
+
+  /* Owner Colors */
+  --color-husband: #3B82F6;
+  --color-wife: #EC4899;
 
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -165,11 +187,32 @@
 }
 
 .btn-primary {
-  @apply h-12 px-6 bg-[#3182F6] text-white font-medium rounded-xl
-         hover:bg-[#1B64DA] active:scale-[0.98] transition-all;
+  @apply h-12 px-6 text-white font-medium rounded-xl active:scale-[0.98] transition-all;
+  background-color: var(--color-brand);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-brand-hover);
 }
 
 .btn-secondary {
   @apply h-12 px-6 bg-slate-100 text-slate-700 font-medium rounded-xl
          hover:bg-slate-200 active:scale-[0.98] transition-all;
+}
+
+/* Transaction Type Colors */
+.text-expense {
+  color: var(--color-expense);
+}
+
+.text-income {
+  color: var(--color-income);
+}
+
+.bg-expense {
+  background-color: var(--color-expense);
+}
+
+.bg-income {
+  background-color: var(--color-income);
 }
