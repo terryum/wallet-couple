@@ -13,6 +13,7 @@ import {
   FileUploader,
   EditModal,
   SimilarTransactionsModal,
+  SummaryCard,
   type FileUploaderRef,
 } from '@/components/transactions';
 import { SharedHeader, SharedBottomNav } from '@/components/layout';
@@ -31,12 +32,6 @@ function getPrevMonth(yearMonth: string): string {
   const [year, month] = yearMonth.split('-').map(Number);
   const date = new Date(year, month - 2, 1);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
-/** 만원 단위로 포맷팅 */
-function formatInMan(amount: number): string {
-  const man = Math.round(amount / 10000);
-  return `${man.toLocaleString()}만원`;
 }
 
 export default function IncomePage() {
@@ -77,6 +72,22 @@ export default function IncomePage() {
     owner: selectedOwner || undefined,
     includeSummary: true,
     transactionType: 'income',
+  });
+
+  // 전체 데이터 조회 (SummaryCard용 - 소득+지출 모두 필요)
+  const { data: allData } = useTransactions({
+    month: selectedMonth,
+    owner: selectedOwner || undefined,
+    includeSummary: true,
+    transactionType: 'all',
+  });
+
+  // 이전 월 전체 데이터 조회 (SummaryCard 증감 비교용)
+  const { data: prevMonthAllData } = useTransactions({
+    month: prevMonth,
+    owner: selectedOwner || undefined,
+    includeSummary: true,
+    transactionType: 'all',
   });
 
   // 카테고리별 합계 금액 계산
@@ -126,16 +137,6 @@ export default function IncomePage() {
   const transactions = useMemo(() => {
     return incomeData?.data || [];
   }, [incomeData]);
-
-  // 총 소득
-  const totalIncome = useMemo(() => {
-    return transactions.reduce((sum, tx) => sum + tx.amount, 0);
-  }, [transactions]);
-
-  // 이전 월 총 소득
-  const prevTotalIncome = useMemo(() => {
-    return (prevMonthData?.data || []).reduce((sum, tx) => sum + tx.amount, 0);
-  }, [prevMonthData]);
 
   // 선택된 카테고리의 총 금액
   const categoryTotal = useMemo(() => {
@@ -220,12 +221,6 @@ export default function IncomePage() {
     }
   }, []);
 
-  // 소득 증감 계산
-  const incomeDiff = totalIncome - prevTotalIncome;
-  const diffText = incomeDiff !== 0
-    ? `${incomeDiff > 0 ? '+' : ''}${Math.round(incomeDiff / 10000).toLocaleString()}만`
-    : '';
-
   return (
     <div
       className="min-h-screen bg-slate-50 pb-24 relative"
@@ -293,23 +288,14 @@ export default function IncomePage() {
         </div>
       </div>
 
-      {/* 소득 요약 카드 */}
+      {/* 요약 카드 (지출 탭과 동일한 SummaryCard 사용) */}
       {!selectedCategory ? (
         <div className="px-5 py-3">
-          <div className="max-w-lg mx-auto bg-white rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium" style={{ color: INCOME_COLOR }}>이번 달 총 소득</span>
-              <div className="flex items-baseline gap-2">
-                <span className="text-lg font-bold tracking-tight text-slate-900">
-                  {formatNumber(totalIncome)}원
-                </span>
-                {diffText && (
-                  <span className={`text-xs ${incomeDiff > 0 ? 'text-blue-500' : 'text-red-500'}`}>
-                    ({diffText})
-                  </span>
-                )}
-              </div>
-            </div>
+          <div className="max-w-lg mx-auto">
+            <SummaryCard
+              transactions={allData?.data || []}
+              prevMonthTransactions={prevMonthAllData?.data || []}
+            />
           </div>
         </div>
       ) : (
