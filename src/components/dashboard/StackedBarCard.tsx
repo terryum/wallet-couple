@@ -24,7 +24,7 @@ import {
   buildStackedBarChartData,
   type StackedBarMonthData,
 } from '@/hooks/useCategoryCalculation';
-import type { Category } from '@/types';
+import type { Category, TransactionType } from '@/types';
 
 interface StackedBarCardProps {
   data: StackedBarMonthData[];
@@ -33,6 +33,8 @@ interface StackedBarCardProps {
   // 하이라이트 동기화용
   highlightedCategory?: string | null;
   onHighlightChange?: (category: string | null) => void;
+  /** 거래 유형: 'expense' | 'income' (기본값: 'expense') */
+  transactionType?: TransactionType;
 }
 
 type PeriodType = 3 | 6 | 12 | 'custom';
@@ -59,7 +61,10 @@ export function StackedBarCard({
   headerMonth,
   highlightedCategory,
   onHighlightChange,
+  transactionType = 'expense',
 }: StackedBarCardProps) {
+  const isIncome = transactionType === 'income';
+  const typeLabel = isIncome ? '소득' : '지출';
   const [period, setPeriod] = useState<PeriodType>(6);
   const [customStart, setCustomStart] = useState<string>('');
   const [customEnd, setCustomEnd] = useState<string>('');
@@ -307,7 +312,7 @@ export function StackedBarCard({
     return (
       <Card className="rounded-2xl">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium">월별 지출 변화</CardTitle>
+          <CardTitle className="text-base font-medium">월별 {typeLabel} 변화</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-12 text-slate-400">
@@ -323,7 +328,7 @@ export function StackedBarCard({
       <Card className="rounded-2xl cursor-pointer" onClick={handleResetHighlight}>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-base font-medium shrink-0">월별 지출 변화</CardTitle>
+            <CardTitle className="text-base font-medium shrink-0">월별 {typeLabel} 변화</CardTitle>
             {/* 기간 선택 */}
             <div className="flex gap-1">
               {([3, 6, 12] as const).map((p) => (

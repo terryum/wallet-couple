@@ -20,6 +20,10 @@ interface TransactionListProps {
   onLongPress?: (transaction: Transaction) => void;
   onDelete?: (transaction: Transaction) => void;
   onUploadClick?: () => void;
+  /** 빈 상태일 때 표시할 메시지 */
+  emptyMessage?: string;
+  /** 빈 상태일 때 표시할 설명 */
+  emptyDescription?: string;
 }
 
 /** 스켈레톤 로딩 UI */
@@ -35,18 +39,25 @@ function TransactionSkeleton() {
 }
 
 /** 빈 상태 UI */
-function EmptyState({ onUploadClick }: { onUploadClick?: () => void }) {
+function EmptyState({
+  onUploadClick,
+  message = '내역이 없습니다',
+  description = '카드 명세서를 업로드하여\n지출 내역을 확인해보세요',
+}: {
+  onUploadClick?: () => void;
+  message?: string;
+  description?: string;
+}) {
   return (
     <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
       <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-5">
         <Upload className="w-8 h-8 text-slate-400" />
       </div>
       <h3 className="text-lg font-bold tracking-tight text-slate-900 mb-2">
-        내역이 없습니다
+        {message}
       </h3>
-      <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-        카드 명세서를 업로드하여<br />
-        지출 내역을 확인해보세요
+      <p className="text-sm text-slate-500 mb-6 leading-relaxed whitespace-pre-line">
+        {description}
       </p>
       {onUploadClick && (
         <button
@@ -105,6 +116,8 @@ export function TransactionList({
   onLongPress,
   onDelete,
   onUploadClick,
+  emptyMessage,
+  emptyDescription,
 }: TransactionListProps) {
   // 정렬 상태
   const [sortColumn, setSortColumn] = useState<SortColumn>('date');
@@ -163,7 +176,11 @@ export function TransactionList({
   if (!transactions || transactions.length === 0) {
     return (
       <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-        <EmptyState onUploadClick={onUploadClick} />
+        <EmptyState
+          onUploadClick={onUploadClick}
+          message={emptyMessage}
+          description={emptyDescription}
+        />
       </div>
     );
   }

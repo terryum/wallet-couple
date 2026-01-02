@@ -17,7 +17,7 @@ import { formatNumber, formatYearMonth } from '@/lib/utils/format';
 import { CategoryPopup } from './CategoryPopup';
 import { CATEGORY_COLORS, getCategoryColor } from '@/constants/chart';
 import { useCategoryCalculation } from '@/hooks/useCategoryCalculation';
-import type { Category } from '@/types';
+import type { Category, TransactionType } from '@/types';
 
 interface CategoryData {
   category: Category;
@@ -42,6 +42,8 @@ interface PieChartCardProps {
   // 하이라이트 동기화용
   highlightedCategory?: string | null;
   onHighlightChange?: (category: string | null) => void;
+  /** 거래 유형: 'expense' | 'income' (기본값: 'expense') */
+  transactionType?: TransactionType;
 }
 
 export function PieChartCard({
@@ -53,7 +55,10 @@ export function PieChartCard({
   trendData,
   highlightedCategory,
   onHighlightChange,
+  transactionType = 'expense',
 }: PieChartCardProps) {
+  const isIncome = transactionType === 'income';
+  const typeLabel = isIncome ? '소득' : '지출';
   // 팝업 상태
   const [popupCategory, setPopupCategory] = useState<string | null>(null);
   const [popupEtcCategories, setPopupEtcCategories] = useState<string[]>([]);
@@ -160,7 +165,7 @@ export function PieChartCard({
       <Card className="rounded-2xl">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium">
-            {formatYearMonth(month)} 지출 비중
+            {formatYearMonth(month)} {typeLabel} 비중
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -178,10 +183,14 @@ export function PieChartCard({
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-medium">
-              {formatYearMonth(month)} 지출 비중
+              {formatYearMonth(month)} {typeLabel} 비중
             </CardTitle>
             {insight && (
-              <span className={`text-sm ${insight.isUp ? 'text-red-500' : 'text-[#3182F6]'}`}>
+              <span className={`text-sm ${
+                isIncome
+                  ? (insight.isUp ? 'text-[#3182F6]' : 'text-red-500')  // 소득: 증가=파랑, 감소=빨강
+                  : (insight.isUp ? 'text-red-500' : 'text-[#3182F6]')  // 지출: 증가=빨강, 감소=파랑
+              }`}>
                 {insight.text}
               </span>
             )}
@@ -266,7 +275,7 @@ export function PieChartCard({
                 }}
               >
                 <div className="text-center">
-                  <p className="text-xs text-slate-400">총 지출</p>
+                  <p className="text-xs text-slate-400">총 {typeLabel}</p>
                   <p className="text-lg font-bold tracking-tight text-slate-900">
                     {formatNumber(total)}원
                   </p>

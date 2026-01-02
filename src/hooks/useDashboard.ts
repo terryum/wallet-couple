@@ -6,7 +6,7 @@
 
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { Category, Owner } from '@/types';
+import type { Category, Owner, TransactionType } from '@/types';
 import { mapSummaryToAggregation } from '@/lib/dashboard/transform';
 
 /** 이전/다음 월 계산 */
@@ -41,15 +41,16 @@ interface MultiMonthData {
   byCategory: CategoryAggregation[];
 }
 
-/** 월별 집계 데이터 조회 (대시보드용 - 지출만) */
+/** 월별 집계 데이터 조회 */
 async function fetchMonthlyAggregation(
   month: string,
-  owner?: Owner
+  owner?: Owner,
+  transactionType: TransactionType = 'expense'
 ): Promise<MonthlyAggregationResponse> {
   const params = new URLSearchParams();
   params.set('month', month);
   params.set('include_summary', 'true');
-  params.set('transaction_type', 'expense'); // 대시보드는 지출만 분석
+  params.set('transaction_type', transactionType);
   if (owner) params.set('owner', owner);
 
   const res = await fetch(`/api/transactions?${params.toString()}`);
@@ -74,11 +75,12 @@ async function fetchMonthlyAggregation(
 /** 여러 월의 집계 데이터 조회 */
 async function fetchMultiMonthAggregation(
   months: string[],
-  owner?: Owner
+  owner?: Owner,
+  transactionType: TransactionType = 'expense'
 ): Promise<MultiMonthData[]> {
   const results = await Promise.all(
     months.map(async (month) => {
-      const data = await fetchMonthlyAggregation(month, owner);
+      const data = await fetchMonthlyAggregation(month, owner, transactionType);
       return {
         month,
         total: data.total,
@@ -106,15 +108,19 @@ export function getRecentMonths(count: number): string[] {
 }
 
 /** 월별 카테고리 집계 훅 (인접 월 프리페칭 포함) */
-export function useMonthlyAggregation(month: string, owner?: Owner) {
+export function useMonthlyAggregation(
+  month: string,
+  owner?: Owner,
+  transactionType: TransactionType = 'expense'
+) {
   const queryClient = useQueryClient();
 
   // 인접 월 프리페칭
   useEffect(() => {
     const prefetchMonth = (targetMonth: string) => {
       queryClient.prefetchQuery({
-        queryKey: ['dashboard', 'monthly', targetMonth, owner],
-        queryFn: () => fetchMonthlyAggregation(targetMonth, owner),
+        queryKey: ['dashboard', 'monthly', targetMonth, owner, transactionType],
+        queryFn: () => fetchMonthlyAggregation(targetMonth, owner, transactionType),
         staleTime: 1000 * 60 * 5,
       });
     };
@@ -124,23 +130,27 @@ export function useMonthlyAggregation(month: string, owner?: Owner) {
 
     prefetchMonth(prevMonth);
     prefetchMonth(nextMonth);
-  }, [month, owner, queryClient]);
+  }, [month, owner, transactionType, queryClient]);
 
   return useQuery({
-    queryKey: ['dashboard', 'monthly', month, owner],
-    queryFn: () => fetchMonthlyAggregation(month, owner),
+    queryKey: ['dashboard', 'monthly', month, owner, transactionType],
+    queryFn: () => fetchMonthlyAggregation(month, owner, transactionType),
     staleTime: 1000 * 60 * 5,
     placeholderData: (previousData) => previousData,
   });
 }
 
 /** 여러 월 집계 훅 (추세 분석용) */
-export function useMultiMonthAggregation(monthCount: number, owner?: Owner) {
+export function useMultiMonthAggregation(
+  monthCount: number,
+  owner?: Owner,
+  transactionType: TransactionType = 'expense'
+) {
   const months = getRecentMonths(monthCount);
 
   return useQuery({
-    queryKey: ['dashboard', 'trend', monthCount, owner],
-    queryFn: () => fetchMultiMonthAggregation(months, owner),
+    queryKey: ['dashboard', 'trend', monthCount, owner, transactionType],
+    queryFn: () => fetchMultiMonthAggregation(months, owner, transactionType),
     staleTime: 1000 * 60 * 5,
   });
 }

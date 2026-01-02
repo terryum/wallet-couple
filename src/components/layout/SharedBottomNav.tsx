@@ -1,51 +1,81 @@
 /**
  * 공통 하단 네비게이션 컴포넌트
+ * 4탭 구조: 지출내역 | 지출분석 | 소득내역 | 소득분석
  */
 
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart2 } from 'lucide-react';
+import { BarChart2, List, TrendingDown, TrendingUp } from 'lucide-react';
+
+const EXPENSE_COLOR = '#EF4444'; // 빨강
+const INCOME_COLOR = '#16A34A';  // 녹색
+
+interface NavTab {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  activeColor: string;
+}
 
 export function SharedBottomNav() {
   const pathname = usePathname();
-  const isHome = pathname === '/';
-  const isDashboard = pathname === '/dashboard';
+
+  const tabs: NavTab[] = [
+    {
+      href: '/',
+      label: '지출',
+      icon: <TrendingDown className="w-4 h-4" />,
+      activeColor: EXPENSE_COLOR,
+    },
+    {
+      href: '/dashboard',
+      label: '지출분석',
+      icon: <BarChart2 className="w-4 h-4" />,
+      activeColor: EXPENSE_COLOR,
+    },
+    {
+      href: '/income',
+      label: '소득',
+      icon: <TrendingUp className="w-4 h-4" />,
+      activeColor: INCOME_COLOR,
+    },
+    {
+      href: '/income/dashboard',
+      label: '소득분석',
+      icon: <BarChart2 className="w-4 h-4" />,
+      activeColor: INCOME_COLOR,
+    },
+  ];
+
+  const isActive = (href: string) => {
+    if (href === '/') return pathname === '/';
+    return pathname === href || pathname.startsWith(href + '/');
+  };
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-slate-200 z-40 pb-safe">
-      <div className="max-w-lg mx-auto px-6 py-2">
-        <div className="flex bg-slate-100 rounded-xl p-1">
-          <Link
-            href="/"
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all ${
-              isHome
-                ? 'bg-white shadow-sm text-[#3182F6]'
-                : 'text-slate-500'
-            }`}
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-            </svg>
-            <span className={`text-sm ${isHome ? 'font-medium' : ''}`}>내역</span>
-          </Link>
-          <Link
-            href="/dashboard"
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-all ${
-              isDashboard
-                ? 'bg-white shadow-sm text-[#3182F6]'
-                : 'text-slate-500'
-            }`}
-          >
-            <BarChart2 className="w-5 h-5" />
-            <span className={`text-sm ${isDashboard ? 'font-medium' : ''}`}>분석</span>
-          </Link>
+      <div className="max-w-lg mx-auto px-4 py-2">
+        <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
+          {tabs.map((tab) => {
+            const active = isActive(tab.href);
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-lg transition-all ${
+                  active ? 'bg-white shadow-sm' : 'text-slate-500'
+                }`}
+                style={active ? { color: tab.activeColor } : undefined}
+              >
+                {tab.icon}
+                <span className={`text-xs ${active ? 'font-medium' : ''}`}>
+                  {tab.label}
+                </span>
+              </Link>
+            );
+          })}
         </div>
       </div>
     </nav>
