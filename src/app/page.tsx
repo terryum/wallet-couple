@@ -6,7 +6,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { Plus, Upload } from 'lucide-react';
+import { Plus, Upload, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
   TransactionList,
@@ -50,6 +50,7 @@ export default function HomePage() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(DEFAULT_FILTERS);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(false);
   const searchActive = isSearchActive(searchFilters);
 
   const editFlow = useTransactionEditFlow({
@@ -266,61 +267,77 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* 공통 헤더 + 검색바 + 카테고리 필터 통합 sticky 영역 */}
+      {/* 공통 헤더 + 카테고리 필터 통합 sticky 영역 */}
       <div className="sticky top-0 z-40 bg-white">
         <SharedHeader />
 
-        {/* 검색바 영역 */}
-        <div className="border-b border-slate-100 px-4 py-2">
+        {/* 카테고리 필터 영역 + 검색 아이콘 */}
+        <div className="border-b border-slate-100 px-4 py-3">
           <div className="max-w-lg mx-auto">
-            <SearchBar
-              filters={searchFilters}
-              onFiltersChange={setSearchFilters}
-              onOpenFilterPanel={() => setFilterPanelOpen(true)}
-            />
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {/* 검색 아이콘 버튼 */}
+              <button
+                onClick={() => setSearchExpanded(!searchExpanded)}
+                className={`shrink-0 w-9 h-9 flex items-center justify-center rounded-xl transition-all ${
+                  searchExpanded || searchActive
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white text-slate-500 border border-slate-100 shadow-sm hover:bg-slate-50'
+                }`}
+              >
+                <Search className="w-4 h-4" />
+              </button>
+
+              {/* 카테고리 필터 (검색 비활성화 시에만 표시) */}
+              {!searchActive && (
+                <>
+                  <Badge
+                    variant="secondary"
+                    className={`shrink-0 cursor-pointer px-3 py-1.5 rounded-xl font-medium transition-all ${
+                      selectedCategory === null
+                        ? 'bg-slate-900 text-white hover:bg-slate-800'
+                        : 'bg-white text-slate-500 border border-slate-100 shadow-sm hover:bg-slate-50'
+                    }`}
+                    onClick={() => setSelectedCategory(null)}
+                  >
+                    전체
+                  </Badge>
+                  {sortedCategories.map((category) => {
+                    const total = categoryTotals.get(category) || 0;
+                    const hasData = total > 0;
+                    return (
+                      <Badge
+                        key={category}
+                        variant="secondary"
+                        className={`shrink-0 px-3 py-1.5 rounded-xl font-medium transition-all ${
+                          !hasData
+                            ? 'bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed'
+                            : selectedCategory === category
+                            ? 'bg-slate-900 text-white hover:bg-slate-800 cursor-pointer'
+                            : 'bg-white text-slate-500 border border-slate-100 shadow-sm hover:bg-slate-50 cursor-pointer'
+                        }`}
+                        onClick={() => hasData && setSelectedCategory(category)}
+                      >
+                        {category}
+                      </Badge>
+                    );
+                  })}
+                </>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* 카테고리 필터 영역 (검색 비활성화 시에만 표시) */}
-        {!searchActive && (
-        <div className="border-b border-slate-100 px-4 py-3">
-          <div className="max-w-lg mx-auto">
-            {/* 카테고리 필터 */}
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            <Badge
-              variant="secondary"
-              className={`shrink-0 cursor-pointer px-3 py-1.5 rounded-xl font-medium transition-all ${
-                selectedCategory === null
-                  ? 'bg-slate-900 text-white hover:bg-slate-800'
-                  : 'bg-white text-slate-500 border border-slate-100 shadow-sm hover:bg-slate-50'
-              }`}
-              onClick={() => setSelectedCategory(null)}
-            >
-              전체
-            </Badge>
-            {sortedCategories.map((category) => {
-              const total = categoryTotals.get(category) || 0;
-              const hasData = total > 0;
-              return (
-                <Badge
-                  key={category}
-                  variant="secondary"
-                  className={`shrink-0 px-3 py-1.5 rounded-xl font-medium transition-all ${
-                    !hasData
-                      ? 'bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed'
-                      : selectedCategory === category
-                      ? 'bg-slate-900 text-white hover:bg-slate-800 cursor-pointer'
-                      : 'bg-white text-slate-500 border border-slate-100 shadow-sm hover:bg-slate-50 cursor-pointer'
-                  }`}
-                  onClick={() => hasData && setSelectedCategory(category)}
-                >
-                  {category}
-                </Badge>
-              );
-            })}
+        {/* 검색바 영역 (펼쳐진 상태일 때만 표시) */}
+        {searchExpanded && (
+          <div className="border-b border-slate-100 px-4 py-2 bg-slate-50">
+            <div className="max-w-lg mx-auto">
+              <SearchBar
+                filters={searchFilters}
+                onFiltersChange={setSearchFilters}
+                onOpenFilterPanel={() => setFilterPanelOpen(true)}
+              />
+            </div>
           </div>
-        </div>
-      </div>
         )}
       </div>
 
