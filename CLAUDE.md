@@ -29,7 +29,7 @@
 | Styling | Tailwind CSS, shadcn/ui |
 | Charts | Recharts |
 | AI | Anthropic Claude API |
-| Testing | Vitest (78개 테스트) |
+| Testing | Vitest (169개 테스트) |
 
 ## 명령어
 
@@ -112,8 +112,8 @@ CREATE TABLE transactions (
 );
 
 -- 매핑
-CREATE TABLE category_mappings (pattern, category, source, match_count);
-CREATE TABLE merchant_name_mappings (original_pattern, preferred_name, match_count);
+CREATE TABLE category_mappings (pattern, category, source, match_count, owner);
+CREATE TABLE merchant_name_mappings (original_pattern, preferred_name, match_count, owner);
 ```
 
 ## 카테고리 (23개)
