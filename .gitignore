@@ -44,3 +44,6 @@ sample-data/
 next-env.d.ts
 
 .vercel
+
+# claude code local settings (contains API keys)
+.claude/settings.local.json
