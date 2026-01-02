@@ -57,10 +57,9 @@ describe('SharedBottomNav 탭 구성', () => {
 });
 
 describe('SharedBottomNav 활성 상태 로직', () => {
-  // isActive 로직 재현
+  // isActive 로직 재현 (정확한 경로 매칭)
   const isActive = (href: string, pathname: string) => {
-    if (href === '/') return pathname === '/';
-    return pathname === href || pathname.startsWith(href + '/');
+    return pathname === href;
   };
 
   it('루트 경로 (/)는 정확히 일치해야만 활성화됨', () => {
@@ -75,10 +74,9 @@ describe('SharedBottomNav 활성 상태 로직', () => {
     expect(isActive('/dashboard', '/income/dashboard')).toBe(false);
   });
 
-  it('/income은 정확히 일치하거나 하위 경로에서 활성화됨', () => {
+  it('/income은 정확히 일치해야만 활성화됨', () => {
     expect(isActive('/income', '/income')).toBe(true);
-    expect(isActive('/income', '/income/dashboard')).toBe(true);
-    expect(isActive('/income', '/income/settings')).toBe(true);
+    expect(isActive('/income', '/income/dashboard')).toBe(false);
     expect(isActive('/income', '/')).toBe(false);
   });
 

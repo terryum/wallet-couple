@@ -6,6 +6,7 @@ import type { Category } from '@/types';
 
 /** 카테고리별 색상 */
 export const CATEGORY_COLORS: Record<string, string> = {
+  // 지출 카테고리
   식료품: '#22c55e',
   '외식/커피': '#f97316',
   쇼핑: '#ec4899',
@@ -24,6 +25,13 @@ export const CATEGORY_COLORS: Record<string, string> = {
   '가전/가구': '#10b981',
   기타: '#9ca3af',
   'etc.': '#9ca3af',
+  // 소득 카테고리
+  급여: '#2563eb',       // 파란색 (메인 소득)
+  상여: '#7c3aed',       // 보라색
+  '정부/환급': '#059669', // 에메랄드
+  '강연/도서': '#ea580c', // 주황색
+  금융소득: '#0891b2',   // 청록색
+  기타소득: '#64748b',   // 슬레이트
 };
 
 /** 최소 표시 카테고리 수 */

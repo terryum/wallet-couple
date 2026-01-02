@@ -50,8 +50,8 @@ export function SharedBottomNav() {
   ];
 
   const isActive = (href: string) => {
-    if (href === '/') return pathname === '/';
-    return pathname === href || pathname.startsWith(href + '/');
+    // 모든 탭은 정확한 경로 매칭 사용
+    return pathname === href;
   };
 
   return (
