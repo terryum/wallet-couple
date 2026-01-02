@@ -52,12 +52,31 @@
 - 매핑 owner 필드 추가 (남편/아내 표시)
 - 변경 히스토리에 누가/언제/변경전후 명확하게 표시
 
-### DB 마이그레이션 필요
-```sql
--- supabase/migrations/20260102_add_owner_to_mappings.sql
-ALTER TABLE category_mappings ADD COLUMN IF NOT EXISTS owner TEXT DEFAULT NULL;
-ALTER TABLE merchant_name_mappings ADD COLUMN IF NOT EXISTS owner TEXT DEFAULT NULL;
-```
+### DB 마이그레이션 필요 ⚠️
+마이그레이션 파일: `supabase/migrations/20260102_add_owner_to_mappings.sql`
+
+**실행 방법 (택 1):**
+
+1. **Supabase Dashboard** (권장)
+   - https://supabase.com/dashboard → 프로젝트 선택 → SQL Editor
+   - 아래 SQL 실행:
+   ```sql
+   ALTER TABLE category_mappings ADD COLUMN IF NOT EXISTS owner TEXT DEFAULT NULL;
+   ALTER TABLE merchant_name_mappings ADD COLUMN IF NOT EXISTS owner TEXT DEFAULT NULL;
+   ```
+
+2. **Supabase CLI**
+   ```bash
+   npx supabase login  # 브라우저에서 인증
+   npx supabase link --project-ref pcxgmvjtqhvkbnmkciho
+   npx supabase db push
+   ```
+
+3. **Supabase MCP**
+   ```bash
+   # Claude Code에서 MCP 인증 필요
+   # supabase: ⚠ Needs authentication 상태 해결 후 사용 가능
+   ```
 
 ---
 
