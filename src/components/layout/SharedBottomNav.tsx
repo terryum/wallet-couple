@@ -1,6 +1,6 @@
 /**
  * 공통 하단 네비게이션 컴포넌트
- * 4탭 구조: 지출내역 | 지출분석 | 소득내역 | 소득분석
+ * 4탭 구조: 지출 | 소득 | 지출분석 | 소득분석
  */
 
 'use client';
@@ -30,16 +30,16 @@ export function SharedBottomNav() {
       activeColor: EXPENSE_COLOR,
     },
     {
-      href: '/dashboard',
-      label: '지출분석',
-      icon: <BarChart2 className="w-4 h-4" />,
-      activeColor: EXPENSE_COLOR,
-    },
-    {
       href: '/income',
       label: '소득',
       icon: <TrendingUp className="w-4 h-4" />,
       activeColor: INCOME_COLOR,
+    },
+    {
+      href: '/dashboard',
+      label: '지출분석',
+      icon: <BarChart2 className="w-4 h-4" />,
+      activeColor: EXPENSE_COLOR,
     },
     {
       href: '/income/dashboard',
