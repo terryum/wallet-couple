@@ -1,94 +1,97 @@
 # Current_Status.md
 
-마지막 업데이트: 2026-01-01
+마지막 업데이트: 2026-01-02
 
-## 1) 현재 구현 상태
+## 현재 구현 상태
 
-### 핵심 기능
-- 파일 업로드 (카드사/은행 명세서) 및 자동 파싱
-- AI 기반 카테고리 자동 분류 (Claude API)
-- 거래 내역 조회/수정/삭제
-- 대시보드 (월별 지출/소득 분석)
-- 비슷한 거래 일괄 수정 기능
+### 완료된 기능 ✅
+
+| 기능 | 설명 |
+|------|------|
+| 파일 업로드 | 카드사/은행/상품권 명세서 파싱 |
+| AI 분류 | Claude API 기반 자동 카테고리 분류 |
+| 거래 CRUD | 조회/수정/삭제/수동 추가 |
+| 일괄 수정 | 비슷한 거래 일괄 카테고리 변경 |
+| 대시보드 | 월별 지출/소득 분석, 차트 |
+| PWA | 홈 화면 설치, 오프라인 캐싱 |
+| 매핑 관리 | 카테고리/이용처 매핑 확인 및 수정 |
 
 ### 지원 소스 타입
-- 카드: 현대카드, 롯데카드, 삼성카드, KB카드, 토스뱅크카드
-- 상품권: 온누리상품권, 성남사랑상품권
-- 은행/증권: 우리은행, 한국투자증권
-- 직접입력
 
-### 최근 추가된 기능
-- Supabase 환경변수 인식 개선 (SUPABASE_ANON_KEY 지원)
-- 업로드 결과 메시지 개선 (파일 수/중복 정보 표시)
-- 패턴 저장 체크박스 (일괄 수정 시 선택적 저장)
-- 사용자 커스텀 설정 중앙 관리 시스템 도입
+- **카드:** 현대카드, 롯데카드, 삼성카드, KB국민카드
+- **은행:** 우리은행 (소득+지출 통합)
+- **상품권:** 온누리상품권, 성남사랑상품권
+- **투자:** 한국투자증권 (예정)
 
-## 2) 아키텍처
+### 테스트 현황
 
-```
-UI (Next.js App Router + React Query)
-    ↓
-API Routes (/api/*)
-    ↓
-Services (src/lib/services/)
-    ↓
-Repositories (src/lib/repositories/)
-    ↓
-Supabase (PostgreSQL + RLS)
-```
+- 총 78개 테스트 통과
+- `npm run test:run`으로 실행
 
-### 주요 모듈
-| 디렉토리 | 역할 |
-|---------|------|
-| `src/lib/ingestion/` | 청구월 추출, 분류 준비, 거래 변환 |
-| `src/lib/classifier/` | AI 기반 카테고리 분류 |
-| `src/lib/customizations/` | 사용자 커스텀 설정 레지스트리 |
-| `src/lib/services/` | 비즈니스 로직 |
-| `src/lib/repositories/` | DB 접근 래퍼 |
-| `src/hooks/` | React Query 훅 |
+---
 
-## 3) 기술 스택
-- Next.js 16.1.1 (App Router)
-- Supabase (PostgreSQL + RLS)
-- TanStack Query (React Query)
-- Tailwind CSS
-- Claude API (카테고리 분류)
+## 다음 단계 (계획)
 
-## 4) 개발 환경 설정
+### Step 1: 문서 정리 ✅ (현재)
+- 17개 md 파일 → 5개로 통합
+
+### Step 2: 소득 대시보드 UI 강화
+- 소득 원천별 분석 차트
+- 월별/연별 소득 추이
+
+### Step 3: 투자 UI (더미데이터)
+- 확정 수익 (배당, 매도차익)
+- 잠재 수익 (미실현 손익)
+- 포트폴리오 현황
+
+### Step 4: portfolio 테이블 구현
+- Supabase에 portfolio 테이블 생성
+- 보유 종목 관리
+
+### Step 5: KIS API 연동
+- 한국투자증권 Open API
+- 실시간 포트폴리오 동기화
+
+---
+
+## 환경 설정
 
 ```bash
-# 개발 서버 실행
+# 개발 서버
 npm run dev
 
-# 빌드
-npm run build
+# 테스트
+npm run test:run
 
 # 타입 체크
 npx tsc --noEmit
 ```
 
 ### 환경 변수 (.env)
-- `SUPABASE_URL` - Supabase 프로젝트 URL
-- `SUPABASE_ANON_KEY` 또는 `SUPABASE_KEY` - Supabase anon key
-- `ANTHROPIC_API_KEY` - Claude API 키
 
-## 5) 주요 문서
-- 제품 요구사항: `PRD_wallet.md`
-- 아키텍처: `ARCHITECTURE.md`
-- 데이터 모델: `DATA_MODEL.md`
-- 리팩토링 기록: `REFACTOR_LOG.md`
-- 테스트 계획: `TEST_PLAN.md`
+```env
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_ANON_KEY=xxx
+ANTHROPIC_API_KEY=xxx
+```
 
-## 6) 최근 변경 이력
+---
 
-### 2026-01-01 (최신)
-- SUPABASE_ANON_KEY 환경변수 인식 추가 (client.ts 수정)
+## 최근 변경 이력
+
+### 2026-01-02
+- 문서 구조 정리 (17개 → 5개)
+- CLAUDE.md, PRD_wallet.md 새로 작성
+- 소득/투자 기능 확장 계획 수립
+
+### 2026-01-01
+- SUPABASE_ANON_KEY 환경변수 인식 추가
 - 사용자 커스텀 설정 중앙 관리 시스템 도입
-  - `src/lib/customizations/` 모듈 추가
-  - 새 커스텀 기능 추가 시 registry.ts에 등록만 하면 초기화에 자동 포함
-- 업로드 결과 메시지 개선
-- 패턴 저장 옵션 체크박스 추가 (SimilarTransactionsModal)
+- 거래 내역 검색/필터 기능 추가
 
-## 7) 알려진 이슈
-- API 키가 잘못 설정된 경우 AI 분류가 "기타"로 fallback됨
+---
+
+## 알려진 이슈
+
+- API 키 미설정 시 AI 분류가 "기타"로 fallback
 - Vercel 배포 시 환경변수 설정 필수
