@@ -153,7 +153,7 @@ export function SummaryCard({ transactions, prevMonthTransactions }: SummaryCard
               {formatNumber(incomeData.total)}
             </span>
             <span className="text-lg font-bold tracking-tight text-slate-900 w-5 text-left">원</span>
-            <span className={`text-xs w-12 text-right ${incomeData.diff !== 0 ? getIncomeDiffColor(incomeData.diff) : 'text-transparent'}`}>
+            <span className={`text-xs w-20 text-right whitespace-nowrap ${incomeData.diff !== 0 ? getIncomeDiffColor(incomeData.diff) : 'text-transparent'}`}>
               {incomeData.diff !== 0 ? formatDiffInMan(incomeData.diff) : '-'}
             </span>
           </div>
@@ -170,7 +170,7 @@ export function SummaryCard({ transactions, prevMonthTransactions }: SummaryCard
                     {formatNumber(item.amount)}
                   </span>
                   <span className="text-sm font-medium text-slate-700 w-4 text-left">원</span>
-                  <span className={`text-[10px] w-12 text-right ${item.diff !== 0 ? getIncomeDiffColor(item.diff) : 'text-transparent'}`}>
+                  <span className={`text-[10px] w-16 text-right whitespace-nowrap ${item.diff !== 0 ? getIncomeDiffColor(item.diff) : 'text-transparent'}`}>
                     {item.diff !== 0 ? formatDiffInMan(item.diff) : '-'}
                   </span>
                 </div>
@@ -202,7 +202,7 @@ export function SummaryCard({ transactions, prevMonthTransactions }: SummaryCard
               {formatNumber(expenseData.total)}
             </span>
             <span className="text-lg font-bold tracking-tight text-slate-900 w-5 text-left">원</span>
-            <span className={`text-xs w-12 text-right ${expenseData.diff !== 0 ? getExpenseDiffColor(expenseData.diff) : 'text-transparent'}`}>
+            <span className={`text-xs w-20 text-right whitespace-nowrap ${expenseData.diff !== 0 ? getExpenseDiffColor(expenseData.diff) : 'text-transparent'}`}>
               {expenseData.diff !== 0 ? formatDiffInMan(expenseData.diff) : '-'}
             </span>
           </div>
@@ -219,7 +219,7 @@ export function SummaryCard({ transactions, prevMonthTransactions }: SummaryCard
                     {formatNumber(item.amount)}
                   </span>
                   <span className="text-sm font-medium text-slate-700 w-4 text-left">원</span>
-                  <span className={`text-[10px] w-12 text-right ${item.diff !== 0 ? getExpenseDiffColor(item.diff) : 'text-transparent'}`}>
+                  <span className={`text-[10px] w-16 text-right whitespace-nowrap ${item.diff !== 0 ? getExpenseDiffColor(item.diff) : 'text-transparent'}`}>
                     {item.diff !== 0 ? formatDiffInMan(item.diff) : '-'}
                   </span>
                 </div>
