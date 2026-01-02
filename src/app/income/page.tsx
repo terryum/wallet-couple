@@ -337,7 +337,8 @@ export default function IncomePage() {
             onDelete={handleDelete}
             onUploadClick={handleUploadClick}
             emptyMessage="소득 내역이 없습니다"
-            emptyDescription="은행 명세서를 업로드하여\n소득 내역을 확인해보세요"
+            emptyDescription={`은행 명세서를 업로드하여
+소득 내역을 확인해보세요`}
           />
         </div>
       </div>

@@ -42,7 +42,8 @@ function TransactionSkeleton() {
 function EmptyState({
   onUploadClick,
   message = '내역이 없습니다',
-  description = '카드 명세서를 업로드하여\n지출 내역을 확인해보세요',
+  description = `카드 명세서를 업로드하여
+지출 내역을 확인해보세요`,
 }: {
   onUploadClick?: () => void;
   message?: string;
