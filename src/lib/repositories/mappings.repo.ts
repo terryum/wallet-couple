@@ -7,6 +7,7 @@ export interface CategoryMapping {
   category: Category;
   source: 'ai' | 'manual';
   match_count: number;
+  owner: 'husband' | 'wife' | null;
   created_at: string;
 }
 
@@ -15,6 +16,7 @@ export interface MerchantNameMapping {
   original_pattern: string;
   preferred_name: string;
   match_count: number;
+  owner: 'husband' | 'wife' | null;
   created_at: string;
 }
 

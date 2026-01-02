@@ -732,6 +732,7 @@ export function StackedBarCard({
         etcCategories={popupEtcCategories}
         month={popupMonth || ''}
         totalAmount={popupTotal}
+        transactionType={transactionType}
       />
     </>
   );

@@ -6,7 +6,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Trash2, Edit2, Check, X, Loader2, Tag, Store, Clock, RotateCcw, ChevronRight, FileUp, AlertTriangle } from 'lucide-react';
+import { Trash2, Loader2, Tag, Store, Clock, RotateCcw, ChevronRight, FileUp, AlertTriangle, Search, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CATEGORY_COLORS } from '@/components/transactions/TransactionRow';
@@ -21,6 +21,7 @@ interface CategoryMapping {
   category: Category;
   source: 'ai' | 'manual';
   match_count: number;
+  owner: 'husband' | 'wife' | null;
   created_at: string;
 }
 
@@ -30,6 +31,7 @@ interface MerchantNameMapping {
   original_pattern: string;
   preferred_name: string;
   match_count: number;
+  owner: 'husband' | 'wife' | null;
   created_at: string;
 }
 
@@ -133,7 +135,15 @@ function MappingDetailPopup({
                 </Badge>
               </div>
               <div className="flex items-center gap-4 text-xs text-slate-500">
-                <span>{categoryMapping.source === 'manual' ? '수동 설정' : 'AI 분류'}</span>
+                <span>
+                  {categoryMapping.source === 'manual'
+                    ? categoryMapping.owner === 'husband'
+                      ? '남편'
+                      : categoryMapping.owner === 'wife'
+                      ? '아내'
+                      : '수동 설정'
+                    : 'AI 분류'}
+                </span>
                 <span>{categoryMapping.match_count}회 적용</span>
               </div>
             </div>
@@ -147,8 +157,15 @@ function MappingDetailPopup({
                 <span className="text-xs text-slate-400">변환 이름</span>
                 <p className="text-sm font-medium text-[#3182F6]">{merchantMapping.preferred_name}</p>
               </div>
-              <div className="text-xs text-slate-500">
-                {merchantMapping.match_count}회 적용
+              <div className="flex items-center gap-4 text-xs text-slate-500">
+                <span>
+                  {merchantMapping.owner === 'husband'
+                    ? '남편'
+                    : merchantMapping.owner === 'wife'
+                    ? '아내'
+                    : '수동 설정'}
+                </span>
+                <span>{merchantMapping.match_count}회 적용</span>
               </div>
             </div>
           )}
@@ -174,58 +191,72 @@ function MappingDetailPopup({
             <p className="text-sm text-slate-400 text-center py-4">변경 히스토리가 없습니다</p>
           ) : (
             <div className="space-y-2">
-              {relatedHistory.map((history) => (
-                <div
-                  key={history.id}
-                  className="p-3 bg-slate-50 rounded-xl"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-slate-700">{history.description}</p>
-                      <p className="text-xs text-slate-400 mt-1">
-                        {formatDateTime(history.created_at)}
-                      </p>
+              {relatedHistory.map((history) => {
+                const ownerLabel = history.owner === 'husband' ? '남편' : history.owner === 'wife' ? '아내' : null;
+                const prevValue = isCategoryMapping
+                  ? (history.previous_data as Record<string, unknown> | null)?.category as string | undefined
+                  : (history.previous_data as Record<string, unknown> | null)?.preferred_name as string | undefined;
+                const newValue = isCategoryMapping
+                  ? (history.new_data as Record<string, unknown> | null)?.category as string | undefined
+                  : (history.new_data as Record<string, unknown> | null)?.preferred_name as string | undefined;
 
-                      {/* 이전/이후 데이터 표시 */}
-                      {history.previous_data && history.new_data && (
-                        <div className="mt-2 text-xs">
-                          <div className="flex items-center gap-1 text-slate-500">
-                            <span className="text-red-400 line-through">
-                              {isCategoryMapping
-                                ? (history.previous_data as Record<string, unknown>).category as string
-                                : (history.previous_data as Record<string, unknown>).preferred_name as string
-                              }
+                return (
+                  <div
+                    key={history.id}
+                    className="p-3 bg-slate-50 rounded-xl"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        {/* 누가 언제 */}
+                        <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
+                          {ownerLabel && (
+                            <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded">
+                              {ownerLabel}
                             </span>
-                            <ChevronRight className="w-3 h-3" />
-                            <span className="text-green-600">
-                              {isCategoryMapping
-                                ? (history.new_data as Record<string, unknown>).category as string
-                                : (history.new_data as Record<string, unknown>).preferred_name as string
-                              }
-                            </span>
-                          </div>
+                          )}
+                          <span>{formatDateTime(history.created_at)}</span>
                         </div>
+
+                        {/* 변경 내용 설명 */}
+                        <p className="text-sm text-slate-700">{history.description}</p>
+
+                        {/* 변경 전/후 데이터 표시 */}
+                        {prevValue && newValue && (
+                          <div className="mt-2 p-2 bg-white rounded-lg border border-slate-100">
+                            <div className="flex items-center gap-2 text-xs">
+                              <div className="flex items-center gap-1">
+                                <span className="text-slate-400">변경 전:</span>
+                                <span className="text-red-500 font-medium">{prevValue}</span>
+                              </div>
+                              <ChevronRight className="w-3 h-3 text-slate-300" />
+                              <div className="flex items-center gap-1">
+                                <span className="text-slate-400">변경 후:</span>
+                                <span className="text-green-600 font-medium">{newValue}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 복구 버튼 */}
+                      {history.previous_data && (
+                        <button
+                          onClick={() => handleRestore(history.id)}
+                          disabled={restoringId === history.id}
+                          className="shrink-0 flex items-center gap-1 px-2 py-1 text-xs text-[#3182F6] hover:bg-[#3182F6]/10 rounded-lg disabled:opacity-50"
+                        >
+                          {restoringId === history.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          )}
+                          복구
+                        </button>
                       )}
                     </div>
-
-                    {/* 복구 버튼 */}
-                    {history.previous_data && (
-                      <button
-                        onClick={() => handleRestore(history.id)}
-                        disabled={restoringId === history.id}
-                        className="shrink-0 flex items-center gap-1 px-2 py-1 text-xs text-[#3182F6] hover:bg-[#3182F6]/10 rounded-lg disabled:opacity-50"
-                      >
-                        {restoringId === history.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <RotateCcw className="w-3.5 h-3.5" />
-                        )}
-                        복구
-                      </button>
-                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -244,6 +275,11 @@ function MappingDetailPopup({
   );
 }
 
+// 소유자 필터 타입
+type OwnerFilter = 'all' | 'husband' | 'wife';
+// 거래 유형 필터 타입
+type TransactionTypeFilter = 'all' | 'expense' | 'income';
+
 export function MappingsManagement() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabType>('category');
@@ -253,9 +289,10 @@ export function MappingsManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 편집 상태
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState<string>('');
+  // 필터 상태
+  const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('all');
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState<TransactionTypeFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // 삭제 중 상태
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -412,81 +449,8 @@ export function MappingsManagement() {
     }
   };
 
-  // 편집 시작
-  const startEdit = (id: string, currentValue: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingId(id);
-    setEditValue(currentValue);
-  };
-
-  // 편집 취소
-  const cancelEdit = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setEditingId(null);
-    setEditValue('');
-  };
-
-  // 카테고리 매핑 저장
-  const saveCategoryEdit = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const res = await fetch('/api/mappings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'category',
-          id,
-          category: editValue,
-        }),
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        setCategoryMappings((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, category: editValue as Category, source: 'manual' } : m))
-        );
-        setEditingId(null);
-        setEditValue('');
-        // 매핑 변경 이벤트 발생
-        window.dispatchEvent(new CustomEvent('mapping-changed'));
-      }
-    } catch (err) {
-      console.error('저장 실패:', err);
-    }
-  };
-
-  // 이용처명 매핑 저장
-  const saveMerchantEdit = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      const res = await fetch('/api/mappings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'merchant',
-          id,
-          preferredName: editValue,
-        }),
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        setMerchantMappings((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, preferred_name: editValue } : m))
-        );
-        setEditingId(null);
-        setEditValue('');
-        // 매핑 변경 이벤트 발생
-        window.dispatchEvent(new CustomEvent('mapping-changed'));
-      }
-    } catch (err) {
-      console.error('저장 실패:', err);
-    }
-  };
-
   // 매핑 클릭 핸들러 (상세 팝업)
   const handleMappingClick = (mapping: CategoryMapping | MerchantNameMapping) => {
-    if (editingId) return; // 편집 중이면 무시
     setSelectedMapping(mapping);
     fetchMappingHistory(mapping.id, activeTab);
   };
@@ -548,45 +512,127 @@ export function MappingsManagement() {
     );
   }
 
-  const currentMappings = activeTab === 'category' ? categoryMappings : merchantMappings;
+  // 사용자가 직접 저장한 패턴만 필터링 (AI 분류 패턴 제외)
+  // + 검색어 필터링
+  const manualCategoryMappings = categoryMappings.filter((m) => {
+    if (m.source !== 'manual') return false;
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      m.pattern.toLowerCase().includes(query) ||
+      m.category.toLowerCase().includes(query)
+    );
+  });
+
+  // 이용처명 매핑 검색 필터링
+  const filteredMerchantMappings = merchantMappings.filter((m) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      m.original_pattern.toLowerCase().includes(query) ||
+      m.preferred_name.toLowerCase().includes(query)
+    );
+  });
+
+  const currentMappings = activeTab === 'category' ? manualCategoryMappings : filteredMerchantMappings;
 
   return (
     <div className="py-2">
-      {/* 탭 */}
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => setActiveTab('category')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-            activeTab === 'category'
-              ? 'bg-[#3182F6] text-white'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Tag className="w-4 h-4" />
-          카테고리 ({categoryMappings.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('merchant')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-            activeTab === 'merchant'
-              ? 'bg-[#3182F6] text-white'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <Store className="w-4 h-4" />
-          이용처명 ({merchantMappings.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('upload')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-            activeTab === 'upload'
-              ? 'bg-[#3182F6] text-white'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <FileUp className="w-4 h-4" />
-          업로드 ({uploadedFiles.length})
-        </button>
+      {/* 탭 + 필터 */}
+      <div className="flex flex-col gap-3 mb-4">
+        {/* 탭 버튼 */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab('category')}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              activeTab === 'category'
+                ? 'bg-[#3182F6] text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Tag className="w-4 h-4" />
+            카테고리 ({manualCategoryMappings.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('merchant')}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              activeTab === 'merchant'
+                ? 'bg-[#3182F6] text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <Store className="w-4 h-4" />
+            이용처명 ({filteredMerchantMappings.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('upload')}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              activeTab === 'upload'
+                ? 'bg-[#3182F6] text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            <FileUp className="w-4 h-4" />
+            업로드 ({uploadedFiles.length})
+          </button>
+        </div>
+
+        {/* 필터 + 검색 */}
+        {(activeTab === 'category' || activeTab === 'merchant') && (
+          <div className="flex items-center gap-2">
+            {/* 소유자 필터 - 카테고리 탭에서만 */}
+            {activeTab === 'category' && (
+              <div className="flex gap-1">
+                {(['all', 'husband', 'wife'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setOwnerFilter(filter)}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
+                      ownerFilter === filter
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    }`}
+                  >
+                    {filter === 'all' ? '전체' : filter === 'husband' ? '남편' : '아내'}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 거래 유형 필터 - 카테고리 탭에서만 */}
+            {activeTab === 'category' && (
+              <div className="flex gap-1">
+                {(['all', 'expense', 'income'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setTransactionTypeFilter(filter)}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
+                      transactionTypeFilter === filter
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    }`}
+                  >
+                    {filter === 'all' ? '전체' : filter === 'expense' ? '지출' : '소득'}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 검색창 */}
+            <div className="flex-1 flex justify-end">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="검색..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-28 pl-7 pr-2 py-1 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-[#3182F6] focus:border-[#3182F6]"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 탭 콘텐츠 */}
@@ -635,8 +681,8 @@ export function MappingsManagement() {
       ) : (
         <div className="space-y-2">
           {activeTab === 'category' ? (
-            // 카테고리 매핑 목록
-            categoryMappings.map((mapping) => (
+            // 카테고리 매핑 목록 (사용자가 직접 저장한 패턴만)
+            manualCategoryMappings.map((mapping) => (
               <div
                 key={mapping.id}
                 className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors"
@@ -648,53 +694,16 @@ export function MappingsManagement() {
                     {mapping.pattern}
                   </p>
                   <p className="text-xs text-slate-400">
-                    {mapping.source === 'manual' ? '수동' : 'AI'} · {mapping.match_count}회 · {formatDateTime(mapping.created_at)}
+                    {mapping.owner === 'husband' ? '남편' : mapping.owner === 'wife' ? '아내' : ''} · {mapping.match_count}회 적용
                   </p>
                 </div>
 
-                {/* 카테고리 (편집 가능) */}
-                {editingId === mapping.id ? (
-                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    <select
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      className="text-xs px-2 py-1 rounded-lg border border-slate-200 bg-white"
-                    >
-                      {ALL_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={(e) => saveCategoryEdit(mapping.id, e)}
-                      className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg"
-                    >
-                      <Check className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      className="p-1.5 text-slate-400 hover:bg-slate-200 rounded-lg"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <Badge
-                      className={`${CATEGORY_COLORS[mapping.category] || CATEGORY_COLORS['기타']} text-xs cursor-pointer`}
-                      onClick={(e) => startEdit(mapping.id, mapping.category, e)}
-                    >
-                      {mapping.category}
-                    </Badge>
-                    <button
-                      onClick={(e) => startEdit(mapping.id, mapping.category, e)}
-                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
+                {/* 카테고리 뱃지 */}
+                <Badge
+                  className={`${CATEGORY_COLORS[mapping.category] || CATEGORY_COLORS['기타']} text-xs`}
+                >
+                  {mapping.category}
+                </Badge>
 
                 {/* 삭제 버튼 */}
                 <button
@@ -715,7 +724,7 @@ export function MappingsManagement() {
             ))
           ) : (
             // 이용처명 매핑 목록
-            merchantMappings.map((mapping) => (
+            filteredMerchantMappings.map((mapping) => (
               <div
                 key={mapping.id}
                 className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors"
@@ -727,51 +736,17 @@ export function MappingsManagement() {
                     {mapping.original_pattern}
                   </p>
                   <p className="text-xs text-slate-400">
-                    {mapping.match_count}회 · {formatDateTime(mapping.created_at)}
+                    {mapping.owner === 'husband' ? '남편' : mapping.owner === 'wife' ? '아내' : ''} · {mapping.match_count}회 적용
                   </p>
                 </div>
 
                 {/* 화살표 */}
                 <span className="text-slate-400 text-sm">→</span>
 
-                {/* 변환된 이름 (편집 가능) */}
-                {editingId === mapping.id ? (
-                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="text"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      className="text-sm px-2 py-1 rounded-lg border border-slate-200 w-32"
-                    />
-                    <button
-                      onClick={(e) => saveMerchantEdit(mapping.id, e)}
-                      className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg"
-                    >
-                      <Check className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      className="p-1.5 text-slate-400 hover:bg-slate-200 rounded-lg"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <span
-                      className="text-sm font-medium text-[#3182F6] cursor-pointer hover:underline"
-                      onClick={(e) => startEdit(mapping.id, mapping.preferred_name, e)}
-                    >
-                      {mapping.preferred_name}
-                    </span>
-                    <button
-                      onClick={(e) => startEdit(mapping.id, mapping.preferred_name, e)}
-                      className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-lg"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
+                {/* 변환된 이름 */}
+                <span className="text-sm font-medium text-[#3182F6]">
+                  {mapping.preferred_name}
+                </span>
 
                 {/* 삭제 버튼 */}
                 <button

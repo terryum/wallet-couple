@@ -22,7 +22,7 @@ import { useModalBackHandler } from '@/hooks/useModalBackHandler';
 import { EditModal } from '@/components/transactions/EditModal';
 import { SimilarTransactionsModal } from '@/components/transactions/SimilarTransactionsModal';
 import { useQueryClient } from '@tanstack/react-query';
-import type { Category, Transaction } from '@/types';
+import type { Category, Transaction, TransactionType } from '@/types';
 
 interface CategoryPopupProps {
   isOpen: boolean;
@@ -31,6 +31,8 @@ interface CategoryPopupProps {
   etcCategories?: string[];
   month: string; // YYYY-MM 형식
   totalAmount?: number;
+  /** 거래 유형: 'expense' | 'income' (기본값: 'expense') */
+  transactionType?: TransactionType;
 }
 
 export function CategoryPopup({
@@ -40,6 +42,7 @@ export function CategoryPopup({
   etcCategories = [],
   month,
   totalAmount,
+  transactionType = 'expense',
 }: CategoryPopupProps) {
   const queryClient = useQueryClient();
 
@@ -64,6 +67,7 @@ export function CategoryPopup({
     {
       month,
       category: (isAll || isEtc) ? undefined : (category as Category | undefined),
+      transactionType,
     },
     { enabled: isOpen && !!category }
   );

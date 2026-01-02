@@ -38,6 +38,7 @@ describe('mappings.service', () => {
         category: '기타' as Category,
         source: 'ai',
         match_count: 1,
+        owner: null,
         created_at: '2025-01-01',
       },
       error: null,

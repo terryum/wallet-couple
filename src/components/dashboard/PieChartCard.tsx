@@ -324,6 +324,7 @@ export function PieChartCard({
         etcCategories={popupEtcCategories}
         month={month}
         totalAmount={popupTotal}
+        transactionType={transactionType}
       />
     </>
   );
