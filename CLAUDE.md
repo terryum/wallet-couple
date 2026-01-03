@@ -70,6 +70,8 @@ src/
 │   │   └── transactions/   # CRUD API
 │   ├── dashboard/          # 지출 분석 화면
 │   ├── income/             # 소득 내역 + 분석
+│   ├── household/          # 가계분석 (소득+지출 통합)
+│   ├── investment/         # 투자 현황 (예정)
 │   └── page.tsx            # 지출 내역 (메인)
 ├── components/
 │   ├── dashboard/          # 차트 컴포넌트 (DashboardPageContent)

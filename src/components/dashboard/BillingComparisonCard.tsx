@@ -1,24 +1,37 @@
 /**
  * 월별 청구금액 카드
- * 월별 청구금액 vs 이용금액 비교 표시
+ * 소득 / 청구금액 / 이용금액 비교 표시 (만원 단위)
  */
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBillingComparison, type BillingComparisonRow } from '@/hooks/useBillingComparison';
-import { formatCurrency } from '@/lib/utils/format';
+import { useMultiMonthAggregation } from '@/hooks/useDashboard';
+import { useAppContext } from '@/contexts/AppContext';
+import { formatManwonNumber } from '@/lib/utils/format';
 
 interface BillingComparisonCardProps {
   months?: number;
 }
 
 export function BillingComparisonCard({ months = 12 }: BillingComparisonCardProps) {
+  const { selectedOwner } = useAppContext();
   const { data, isLoading } = useBillingComparison(months);
+  const { data: incomeData, isLoading: isLoadingIncome } = useMultiMonthAggregation(months, selectedOwner || undefined, 'income');
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
+
+  // 월별 소득 데이터 맵 생성
+  const incomeByMonth = useMemo(() => {
+    const map: Record<string, number> = {};
+    incomeData?.forEach((d) => {
+      map[d.month] = d.total;
+    });
+    return map;
+  }, [incomeData]);
 
   if (isLoading) {
     return (
@@ -62,11 +75,12 @@ export function BillingComparisonCard({ months = 12 }: BillingComparisonCardProp
         <CardTitle className="text-base font-medium">월별 청구금액</CardTitle>
       </CardHeader>
       <CardContent>
-        {/* 테이블 헤더 */}
+        {/* 테이블 헤더 - 만원 단위 */}
         <div className="flex items-center px-4 py-2 border-b border-slate-200 text-xs text-slate-500 font-medium">
           <span className="flex-1 text-center">기간</span>
-          <span className="w-24 text-center">청구금액</span>
-          <span className="w-24 text-center">이용금액</span>
+          <span className="w-16 text-center">소득</span>
+          <span className="w-16 text-center">청구</span>
+          <span className="w-16 text-center">이용</span>
         </div>
 
         <div className="space-y-1 mt-1">
@@ -74,6 +88,7 @@ export function BillingComparisonCard({ months = 12 }: BillingComparisonCardProp
             <MonthRow
               key={item.month}
               data={item}
+              incomeAmount={incomeByMonth[item.month] || 0}
               isExpanded={expandedMonth === item.month}
               onToggle={() => toggleExpand(item.month)}
             />
@@ -86,11 +101,12 @@ export function BillingComparisonCard({ months = 12 }: BillingComparisonCardProp
 
 interface MonthRowProps {
   data: BillingComparisonRow;
+  incomeAmount: number;
   isExpanded: boolean;
   onToggle: () => void;
 }
 
-function MonthRow({ data, isExpanded, onToggle }: MonthRowProps) {
+function MonthRow({ data, incomeAmount, isExpanded, onToggle }: MonthRowProps) {
   return (
     <div className="border border-slate-100 rounded-lg overflow-hidden">
       {/* 월별 요약 행 */}
@@ -107,13 +123,17 @@ function MonthRow({ data, isExpanded, onToggle }: MonthRowProps) {
           <span className="text-xs text-slate-400">{data.monthLabel}</span>
         </div>
 
-        {/* 청구금액 */}
-        <span className="text-sm text-slate-700 w-24 text-right">
-          {data.hasBilling ? formatCurrency(data.billing_amount) : '-'}
+        {/* 소득 (만원 단위) */}
+        <span className="text-sm text-emerald-600 w-16 text-right font-medium">
+          {incomeAmount > 0 ? formatManwonNumber(incomeAmount) : '-'}
         </span>
-        {/* 이용금액 */}
-        <span className="text-sm text-slate-700 w-24 text-right">
-          {formatCurrency(data.usage_amount)}
+        {/* 청구금액 (만원 단위) */}
+        <span className="text-sm text-slate-700 w-16 text-right">
+          {data.hasBilling ? formatManwonNumber(data.billing_amount) : '-'}
+        </span>
+        {/* 이용금액 (만원 단위) */}
+        <span className="text-sm text-slate-700 w-16 text-right">
+          {formatManwonNumber(data.usage_amount)}
         </span>
       </button>
 
@@ -126,11 +146,12 @@ function MonthRow({ data, isExpanded, onToggle }: MonthRowProps) {
               className="flex items-center py-1.5 text-xs"
             >
               <span className="text-slate-600 pl-6 flex-1">{card.source_type}</span>
-              <span className="text-slate-600 w-24 text-right">
-                {card.hasBilling ? formatCurrency(card.billing_amount) : '-'}
+              <span className="text-slate-600 w-16 text-right">-</span>
+              <span className="text-slate-600 w-16 text-right">
+                {card.hasBilling ? formatManwonNumber(card.billing_amount) : '-'}
               </span>
-              <span className="text-slate-600 w-24 text-right">
-                {formatCurrency(card.usage_amount)}
+              <span className="text-slate-600 w-16 text-right">
+                {formatManwonNumber(card.usage_amount)}
               </span>
             </div>
           ))}

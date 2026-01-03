@@ -1,19 +1,9 @@
 /**
- * 지출 분석 페이지
- * DashboardPageContent 공통 컴포넌트 사용
+ * 지출 분석 페이지 → /household로 리다이렉트
  */
 
-'use client';
-
-import { DashboardPageContent } from '@/components/dashboard';
+import { redirect } from 'next/navigation';
 
 export default function DashboardPage() {
-  return (
-    <DashboardPageContent
-      transactionType="expense"
-      modalIdBase="dashboard"
-      categoryClickPath="/"
-      showBillingComparison={true}
-    />
-  );
+  redirect('/household');
 }

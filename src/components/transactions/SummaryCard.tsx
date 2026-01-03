@@ -23,17 +23,17 @@ function formatDiffInMan(diff: number): string {
   return `(${sign}${absMan}만)`;
 }
 
-/** 소득 변동 색상: 증가=파랑, 감소=빨강 */
+/** 소득 변동 색상: 증가=초록(좋음), 감소=파랑(나쁨) */
 function getIncomeDiffColor(diff: number): string {
-  if (diff > 0) return 'text-blue-500';
-  if (diff < 0) return 'text-red-500';
+  if (diff > 0) return 'text-emerald-600';
+  if (diff < 0) return 'text-blue-600';
   return 'text-slate-400';
 }
 
-/** 지출 변동 색상: 증가=빨강, 감소=파랑 (반대) */
+/** 지출 변동 색상: 증가=파랑(나쁨), 감소=초록(좋음) */
 function getExpenseDiffColor(diff: number): string {
-  if (diff > 0) return 'text-red-500';
-  if (diff < 0) return 'text-blue-500';
+  if (diff > 0) return 'text-blue-600';
+  if (diff < 0) return 'text-emerald-600';
   return 'text-slate-400';
 }
 
@@ -141,11 +141,11 @@ export function SummaryCard({ transactions, prevMonthTransactions }: SummaryCard
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-blue-600">이번 달 총 소득</span>
+            <span className="text-sm font-medium text-emerald-600">이번 달 총 소득</span>
             {incomeExpanded ? (
-              <ChevronUp className="w-4 h-4 text-blue-400" />
+              <ChevronUp className="w-4 h-4 text-emerald-500" />
             ) : (
-              <ChevronDown className="w-4 h-4 text-blue-400" />
+              <ChevronDown className="w-4 h-4 text-emerald-500" />
             )}
           </div>
           <div className="flex items-baseline">
@@ -190,11 +190,11 @@ export function SummaryCard({ transactions, prevMonthTransactions }: SummaryCard
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-red-500">이번 달 총 지출</span>
+            <span className="text-sm font-medium text-blue-600">이번 달 총 지출</span>
             {expenseExpanded ? (
-              <ChevronUp className="w-4 h-4 text-red-400" />
+              <ChevronUp className="w-4 h-4 text-blue-500" />
             ) : (
-              <ChevronDown className="w-4 h-4 text-red-400" />
+              <ChevronDown className="w-4 h-4 text-blue-500" />
             )}
           </div>
           <div className="flex items-baseline">

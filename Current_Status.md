@@ -15,9 +15,10 @@
 | 대시보드 | 월별 지출/소득 분석, 차트 |
 | PWA | 홈 화면 설치, 오프라인 캐싱 |
 | 매핑 관리 | 카테고리/이용처 매핑 확인 및 수정 |
-| **4탭 네비게이션** | 지출 \| 소득 \| 지출분석 \| 소득분석 |
+| **5탭 네비게이션** | 지출 \| 소득 \| 분석 \| 가계 \| 투자 |
 | **공통 컴포넌트** | TransactionPageContent, DashboardPageContent |
 | **디자인 시스템** | 토스 스타일 블루 기반 색상 시스템 |
+| **가계분석 통합** | 소득/지출 통합 분석 (IncomeExpenseBarCard) |
 
 ### 지원 소스 타입
 
@@ -35,45 +36,47 @@
 
 ## 최근 작업 (2026-01-03)
 
-### 디자인 시스템 전면 재정비 ✅
+### 가계분석 탭 통합 ✅
 
-#### 새 색상 시스템 (`src/constants/colors.ts`)
-- **브랜드:** `#3182F6` (토스 블루)
-- **지출:** 블루→퍼플→핑크→오렌지 (초록 제외 - 소득과 구분)
-- **소득:** 에메랄드/그린 계열
+#### 통합 차트 구조 (IncomeExpenseBarCard)
+```
+"월별 소득/지출 변화" (메인 카드)
+├── 헤더: 제목 + 기간 선택 (3/6/12/직접입력) ← 공유
+│
+├── "소득/지출 분석" 섹션
+│   └── 소득 막대(↑) + 지출 막대(↓) + 손익선
+│   └── 선택된 월 요약
+│
+└── "카테고리 분석" 섹션
+    ├── 1줄: [전체 소득] [급여] [상여] ... (초록색)
+    ├── 2줄: [전체 지출] [식료품] [외식] ... (파란색)
+    └── 막대 차트 (위쪽 방향) + 합계 표시
+```
 
-#### 차트 색상 스펙트럼
-```
-지출: 블루 → 인디고 → 스카이 → 바이올렛 → 퍼플 → 핑크 → 로즈 → 오렌지
-소득: 에메랄드 계열 (급여~기타소득)
-```
+#### 핵심 변경사항
+- **월 동기화:** selectedMonth 변경 시 모든 차트가 해당 월을 끝월로 사용
+- **손익선 확장:** 전후 1개월 추가 조회하여 경계에서 잘린 효과
+- **색상 통일:** 지출=파랑 (`#3182F6`), 소득=초록 (`#059669`)
+- **CategoryTrendCard 통합:** 별도 컴포넌트 제거, IncomeExpenseBarCard에 통합
 
 #### 수정된 파일
-- `src/constants/colors.ts` (신규 - 중앙 색상 정의)
-- `src/constants/chart.ts` → colors.ts에서 import
-- `src/app/globals.css` → CSS 변수 추가
-- `src/components/transactions/TransactionRow.tsx`
-- `src/components/layout/SharedBottomNav.tsx`
-- `src/components/layout/SharedHeader.tsx`
-- `src/components/dashboard/PieChartCard.tsx`
-- `src/components/dashboard/StackedBarCard.tsx`
+- `src/hooks/useDashboard.ts` - endMonth 파라미터, includeExtended 옵션 추가
+- `src/components/dashboard/IncomeExpenseBarCard.tsx` - 통합 차트로 리팩토링
+- `src/components/dashboard/HouseholdDashboardContent.tsx` - CategoryTrendCard 제거
+- `src/components/dashboard/index.ts` - CategoryTrendCard export 제거
+- `src/components/dashboard/CategoryTrendCard.tsx` - 삭제
 
-### 탭 통합 리팩토링 ✅
+### 색상 규칙 정립 ✅
 
-#### 공통 컴포넌트 생성
-- `TransactionPageContent.tsx` - 지출/소득 내역 페이지 공통화
-- `DashboardPageContent.tsx` - 지출/소득 분석 페이지 공통화
-- 코드 92% 감소 (800줄 → 80줄)
+#### 변동 표시 색상 (좋음/나쁨)
+| 항목 | 증가 | 감소 |
+|------|------|------|
+| 소득 | 🟢 초록 (좋음) | 🔵 파랑 (나쁨) |
+| 지출 | 🔵 파랑 (나쁨) | 🟢 초록 (좋음) |
 
-#### 탭 순서 변경
-- 기존: 지출 | 지출분석 | 소득 | 소득분석
-- 변경: **지출 | 소득 | 지출분석 | 소득분석**
-
-### UI 개선 ✅
-
-- **검색 토글:** 검색 아이콘 클릭 시 검색창 확장/축소
-- **SummaryCard 폭 조정:** 금액 표시 두 줄 방지
-- **StackedBarCard 레전드:** 4개씩 그리드, PieChartCard 순서와 동기화
+#### SummaryCard 수정
+- `getIncomeDiffColor`: 증가=초록, 감소=파랑
+- `getExpenseDiffColor`: 증가=파랑, 감소=초록
 
 ---
 
@@ -81,32 +84,39 @@
 
 ### 디자인 시스템
 - **단일 소스:** `src/constants/colors.ts`에서 모든 색상 관리
-- **지출/소득 색상 분리:** 지출(블루~오렌지), 소득(그린) - 혼동 방지
+- **지출/소득 색상 분리:** 지출(파랑), 소득(초록) - 혼동 방지
 - **CSS 변수:** `globals.css`에 `--color-brand`, `--color-expense`, `--color-income` 등
 
 ### 컴포넌트 구조
 - **페이지:** 최소 코드 (props만 전달)
-- **공통 컴포넌트:** `TransactionPageContent`, `DashboardPageContent`
+- **공통 컴포넌트:** `TransactionPageContent`, `DashboardPageContent`, `IncomeExpenseBarCard`
 - **색상 함수:** `getCategoryColor()`, `getBadgeColorClass()`
+
+### 가계분석 데이터 흐름
+```
+selectedMonth (AppContext)
+    ↓
+useMultiMonthBothAggregation(monthCount, owner, endMonth, includeExtended)
+    ↓
+IncomeExpenseBarCard
+├── 소득/지출 분석 (ComposedChart)
+└── 카테고리 분석 (BarChart)
+```
 
 ---
 
 ## 다음 단계 (계획)
 
-### Step 1: 소득 대시보드 강화
-- 소득 원천별 분석 차트
-- 월별/연별 소득 추이
-
-### Step 2: 투자 UI (더미데이터)
+### Step 1: 투자 UI (더미데이터)
 - 확정 수익 (배당, 매도차익)
 - 잠재 수익 (미실현 손익)
 - 포트폴리오 현황
 
-### Step 3: portfolio 테이블 구현
+### Step 2: portfolio 테이블 구현
 - Supabase에 portfolio 테이블 생성
 - 보유 종목 관리
 
-### Step 4: KIS API 연동
+### Step 3: KIS API 연동
 - 한국투자증권 Open API
 - 실시간 포트폴리오 동기화
 

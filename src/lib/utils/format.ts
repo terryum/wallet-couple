@@ -21,6 +21,26 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
+ * 금액을 만원 단위로 변환
+ * @param amount - 금액 (원 단위)
+ * @returns 포맷된 문자열 (예: 123만원, 1,234만원)
+ */
+export function formatManwon(amount: number): string {
+  const manwon = Math.round(amount / 10000);
+  return `${formatNumber(manwon)}만원`;
+}
+
+/**
+ * 금액을 만원 단위 숫자로만 변환 (단위 없이)
+ * @param amount - 금액 (원 단위)
+ * @returns 포맷된 문자열 (예: 123, 1,234)
+ */
+export function formatManwonNumber(amount: number): string {
+  const manwon = Math.round(amount / 10000);
+  return formatNumber(manwon);
+}
+
+/**
  * Date 객체 또는 문자열을 YYYY-MM-DD 형식으로 변환
  * @param date - Date 객체 또는 날짜 문자열
  * @returns YYYY-MM-DD 형식의 문자열

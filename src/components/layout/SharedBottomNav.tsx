@@ -1,6 +1,6 @@
 /**
  * 공통 하단 네비게이션 컴포넌트
- * 4탭 구조: 지출 | 소득 | 지출분석 | 소득분석
+ * 4탭 구조: 지출 | 소득 | 가계분석 | 투자분석
  * Design System: 토스 스타일 블루 기반
  */
 
@@ -8,12 +8,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart2, TrendingDown, TrendingUp } from 'lucide-react';
-import { transaction } from '@/constants/colors';
+import { PieChart, TrendingDown, TrendingUp, LineChart } from 'lucide-react';
+import { transaction, brand } from '@/constants/colors';
 
 // 거래 유형별 색상 (colors.ts에서 중앙 관리)
 const EXPENSE_COLOR = transaction.expense; // #FF5252
 const INCOME_COLOR = transaction.income;   // #00C853
+const BRAND_COLOR = brand.primary;         // #3182F6
 
 interface NavTab {
   href: string;
@@ -39,16 +40,16 @@ export function SharedBottomNav() {
       activeColor: INCOME_COLOR,
     },
     {
-      href: '/dashboard',
-      label: '지출분석',
-      icon: <BarChart2 className="w-4 h-4" />,
-      activeColor: EXPENSE_COLOR,
+      href: '/household',
+      label: '가계분석',
+      icon: <PieChart className="w-4 h-4" />,
+      activeColor: BRAND_COLOR,
     },
     {
-      href: '/income/dashboard',
-      label: '소득분석',
-      icon: <BarChart2 className="w-4 h-4" />,
-      activeColor: INCOME_COLOR,
+      href: '/investment',
+      label: '투자분석',
+      icon: <LineChart className="w-4 h-4" />,
+      activeColor: BRAND_COLOR,
     },
   ];
 

@@ -92,13 +92,23 @@ async function fetchMultiMonthAggregation(
   return results;
 }
 
-/** 최근 N개월 목록 생성 */
-export function getRecentMonths(count: number): string[] {
+/** 최근 N개월 목록 생성 (endMonth 기준) */
+export function getRecentMonths(count: number, endMonth?: string): string[] {
   const months: string[] = [];
-  const now = new Date();
+
+  let endYear: number;
+  let endMonthNum: number;
+
+  if (endMonth) {
+    [endYear, endMonthNum] = endMonth.split('-').map(Number);
+  } else {
+    const now = new Date();
+    endYear = now.getFullYear();
+    endMonthNum = now.getMonth() + 1;
+  }
 
   for (let i = 0; i < count; i++) {
-    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const date = new Date(endYear, endMonthNum - 1 - i, 1);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     months.push(`${year}-${month}`);
@@ -144,13 +154,152 @@ export function useMonthlyAggregation(
 export function useMultiMonthAggregation(
   monthCount: number,
   owner?: Owner,
-  transactionType: TransactionType = 'expense'
+  transactionType: TransactionType = 'expense',
+  endMonth?: string
 ) {
-  const months = getRecentMonths(monthCount);
+  const months = getRecentMonths(monthCount, endMonth);
 
   return useQuery({
-    queryKey: ['dashboard', 'trend', monthCount, owner, transactionType],
+    queryKey: ['dashboard', 'trend', monthCount, owner, transactionType, endMonth],
     queryFn: () => fetchMultiMonthAggregation(months, owner, transactionType),
     staleTime: 1000 * 60 * 5,
   });
 }
+
+// ============================================
+// 가계분석용: 소득+지출 동시 조회
+// ============================================
+
+/** 소득+지출 월별 집계 응답 */
+interface BothMonthlyAggregationResponse {
+  income: MonthlyAggregationResponse;
+  expense: MonthlyAggregationResponse;
+  isLoading: boolean;
+}
+
+/** 소득+지출 월별 집계 훅 */
+export function useMonthlyBothAggregation(
+  month: string,
+  owner?: Owner
+): BothMonthlyAggregationResponse {
+  const incomeQuery = useMonthlyAggregation(month, owner, 'income');
+  const expenseQuery = useMonthlyAggregation(month, owner, 'expense');
+
+  return {
+    income: incomeQuery.data ?? {
+      success: false,
+      data: [],
+      month,
+      total: 0,
+      totalCount: 0,
+    },
+    expense: expenseQuery.data ?? {
+      success: false,
+      data: [],
+      month,
+      total: 0,
+      totalCount: 0,
+    },
+    isLoading: incomeQuery.isLoading || expenseQuery.isLoading,
+  };
+}
+
+/** 소득+지출 여러 월 집계 데이터 */
+export interface CombinedMonthData {
+  month: string;       // "1월"
+  fullMonth: string;   // "2025-01"
+  income: number;
+  expense: number;
+  balance: number;     // income - expense
+  incomeByCategory: CategoryAggregation[];
+  expenseByCategory: CategoryAggregation[];
+  isExtended?: boolean; // 확장 데이터 여부 (손익선 연장용)
+}
+
+/** 소득+지출 여러 월 집계 훅 */
+export function useMultiMonthBothAggregation(
+  monthCount: number,
+  owner?: Owner,
+  endMonth?: string,
+  includeExtended?: boolean // 손익선 연장을 위한 전후 1개월 포함
+) {
+  // 확장 데이터 포함 시 전후 1개월씩 추가 조회
+  const extendedCount = includeExtended ? monthCount + 2 : monthCount;
+  const extendedEndMonth = includeExtended && endMonth
+    ? getAdjacentMonth(endMonth, 1)
+    : endMonth;
+
+  const incomeQuery = useMultiMonthAggregation(extendedCount, owner, 'income', extendedEndMonth);
+  const expenseQuery = useMultiMonthAggregation(extendedCount, owner, 'expense', extendedEndMonth);
+
+  const combinedData: CombinedMonthData[] = [];
+
+  if (incomeQuery.data && expenseQuery.data) {
+    for (let i = 0; i < incomeQuery.data.length; i++) {
+      const incomeMonth = incomeQuery.data[i];
+      const expenseMonth = expenseQuery.data[i];
+
+      // 확장 데이터인지 표시 (첫 번째와 마지막)
+      const isExtended = includeExtended && (i === 0 || i === incomeQuery.data.length - 1);
+
+      combinedData.push({
+        month: `${parseInt(incomeMonth.month.slice(5))}월`,
+        fullMonth: incomeMonth.month,
+        income: incomeMonth.total,
+        expense: expenseMonth?.total || 0,
+        balance: incomeMonth.total - (expenseMonth?.total || 0),
+        incomeByCategory: incomeMonth.byCategory,
+        expenseByCategory: expenseMonth?.byCategory || [],
+        isExtended,
+      });
+    }
+  }
+
+  return {
+    data: combinedData,
+    isLoading: incomeQuery.isLoading || expenseQuery.isLoading,
+  };
+}
+
+// ============================================
+// 카테고리별 트렌드 조회
+// ============================================
+
+/** 카테고리별 트렌드 데이터 */
+export interface CategoryTrendData {
+  month: string;       // "1월"
+  fullMonth: string;   // "2025-01"
+  amount: number;
+}
+
+/** 특정 카테고리의 월별 트렌드 조회 */
+export function useCategoryTrend(
+  monthCount: number,
+  category: Category | null,
+  transactionType: TransactionType,
+  owner?: Owner,
+  endMonth?: string
+) {
+  const multiMonthQuery = useMultiMonthAggregation(monthCount, owner, transactionType, endMonth);
+
+  const trendData: CategoryTrendData[] = [];
+
+  if (multiMonthQuery.data && category) {
+    for (const monthData of multiMonthQuery.data) {
+      const categoryData = monthData.byCategory.find((c) => c.category === category);
+      trendData.push({
+        month: `${parseInt(monthData.month.slice(5))}월`,
+        fullMonth: monthData.month,
+        amount: categoryData?.total_amount || 0,
+      });
+    }
+  }
+
+  return {
+    data: trendData,
+    isLoading: multiMonthQuery.isLoading,
+  };
+}
+
+// Re-export types for external use
+export type { CategoryAggregation, MonthlyAggregationResponse, MultiMonthData };

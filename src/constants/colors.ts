@@ -32,10 +32,15 @@ export const semantic = {
 // 거래 유형 컬러
 // ============================================
 export const transaction = {
-  expense: '#FF5252',       // 지출 (빨강)
-  expenseLight: '#FFEBEE',
-  income: '#00C853',        // 소득 (초록)
-  incomeLight: '#E8F9EE',
+  expense: '#3182F6',       // 지출 (파란색 - 브랜드 블루)
+  expenseLight: '#E8F3FF',
+  expenseDark: '#1D4ED8',   // 지출 진한 버전
+  income: '#059669',        // 소득 (짙은 초록 - emerald-600)
+  incomeLight: '#D1FAE5',
+  incomeDark: '#047857',    // 소득 진한 버전 (emerald-700)
+  balance: '#FF5252',       // 손익선 (빨간색)
+  balancePositive: '#059669', // 양수 손익 (초록)
+  balanceNegative: '#3182F6', // 음수 손익 (파랑)
 } as const;
 
 // ============================================
