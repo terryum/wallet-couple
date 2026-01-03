@@ -23,19 +23,6 @@ function formatDiffInMan(diff: number): string {
   return `(${sign}${absMan}만)`;
 }
 
-/** 소득 변동 색상: 증가=초록(좋음), 감소=파랑(나쁨) */
-function getIncomeDiffColor(diff: number): string {
-  if (diff > 0) return 'text-emerald-600';
-  if (diff < 0) return 'text-blue-600';
-  return 'text-slate-400';
-}
-
-/** 지출 변동 색상: 증가=파랑(나쁨), 감소=초록(좋음) */
-function getExpenseDiffColor(diff: number): string {
-  if (diff > 0) return 'text-blue-600';
-  if (diff < 0) return 'text-emerald-600';
-  return 'text-slate-400';
-}
 
 export function SummaryCard({ transactions, prevMonthTransactions }: SummaryCardProps) {
   const [incomeExpanded, setIncomeExpanded] = useState(false);
@@ -142,20 +129,24 @@ export function SummaryCard({ transactions, prevMonthTransactions }: SummaryCard
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-emerald-600">이번 달 총 소득</span>
+            {incomeData.diff !== 0 && (
+              <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                {formatDiffInMan(incomeData.diff)}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-baseline">
+              <span className="text-lg font-bold tracking-tight text-slate-900 tabular-nums">
+                {formatNumber(incomeData.total)}
+              </span>
+              <span className="text-lg font-bold tracking-tight text-slate-900">원</span>
+            </div>
             {incomeExpanded ? (
               <ChevronUp className="w-4 h-4 text-emerald-500" />
             ) : (
               <ChevronDown className="w-4 h-4 text-emerald-500" />
             )}
-          </div>
-          <div className="flex items-baseline">
-            <span className="text-lg font-bold tracking-tight text-slate-900 tabular-nums text-right w-28">
-              {formatNumber(incomeData.total)}
-            </span>
-            <span className="text-lg font-bold tracking-tight text-slate-900 w-5 text-left">원</span>
-            <span className={`text-xs w-20 text-right whitespace-nowrap ${incomeData.diff !== 0 ? getIncomeDiffColor(incomeData.diff) : 'text-transparent'}`}>
-              {incomeData.diff !== 0 ? formatDiffInMan(incomeData.diff) : '-'}
-            </span>
           </div>
         </div>
 
@@ -163,16 +154,20 @@ export function SummaryCard({ transactions, prevMonthTransactions }: SummaryCard
         {incomeExpanded && (
           <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
             {incomeData.items.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between pl-4">
-                <span className="text-xs text-slate-500">{item.label}</span>
+              <div key={idx} className="flex items-center justify-between pl-4 pr-6">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">{item.label}</span>
+                  {item.diff !== 0 && (
+                    <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                      {formatDiffInMan(item.diff)}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-baseline">
-                  <span className="text-sm font-medium text-slate-700 tabular-nums text-right w-24">
+                  <span className="text-sm font-medium text-slate-700 tabular-nums">
                     {formatNumber(item.amount)}
                   </span>
-                  <span className="text-sm font-medium text-slate-700 w-4 text-left">원</span>
-                  <span className={`text-[10px] w-16 text-right whitespace-nowrap ${item.diff !== 0 ? getIncomeDiffColor(item.diff) : 'text-transparent'}`}>
-                    {item.diff !== 0 ? formatDiffInMan(item.diff) : '-'}
-                  </span>
+                  <span className="text-sm font-medium text-slate-700">원</span>
                 </div>
               </div>
             ))}
@@ -191,20 +186,24 @@ export function SummaryCard({ transactions, prevMonthTransactions }: SummaryCard
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-blue-600">이번 달 총 지출</span>
+            {expenseData.diff !== 0 && (
+              <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                {formatDiffInMan(expenseData.diff)}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-baseline">
+              <span className="text-lg font-bold tracking-tight text-slate-900 tabular-nums">
+                {formatNumber(expenseData.total)}
+              </span>
+              <span className="text-lg font-bold tracking-tight text-slate-900">원</span>
+            </div>
             {expenseExpanded ? (
               <ChevronUp className="w-4 h-4 text-blue-500" />
             ) : (
               <ChevronDown className="w-4 h-4 text-blue-500" />
             )}
-          </div>
-          <div className="flex items-baseline">
-            <span className="text-lg font-bold tracking-tight text-slate-900 tabular-nums text-right w-28">
-              {formatNumber(expenseData.total)}
-            </span>
-            <span className="text-lg font-bold tracking-tight text-slate-900 w-5 text-left">원</span>
-            <span className={`text-xs w-20 text-right whitespace-nowrap ${expenseData.diff !== 0 ? getExpenseDiffColor(expenseData.diff) : 'text-transparent'}`}>
-              {expenseData.diff !== 0 ? formatDiffInMan(expenseData.diff) : '-'}
-            </span>
           </div>
         </div>
 
@@ -212,16 +211,20 @@ export function SummaryCard({ transactions, prevMonthTransactions }: SummaryCard
         {expenseExpanded && (
           <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
             {expenseData.items.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between pl-4">
-                <span className="text-xs text-slate-500">{item.label}</span>
+              <div key={idx} className="flex items-center justify-between pl-4 pr-6">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500">{item.label}</span>
+                  {item.diff !== 0 && (
+                    <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                      {formatDiffInMan(item.diff)}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-baseline">
-                  <span className="text-sm font-medium text-slate-700 tabular-nums text-right w-24">
+                  <span className="text-sm font-medium text-slate-700 tabular-nums">
                     {formatNumber(item.amount)}
                   </span>
-                  <span className="text-sm font-medium text-slate-700 w-4 text-left">원</span>
-                  <span className={`text-[10px] w-16 text-right whitespace-nowrap ${item.diff !== 0 ? getExpenseDiffColor(item.diff) : 'text-transparent'}`}>
-                    {item.diff !== 0 ? formatDiffInMan(item.diff) : '-'}
-                  </span>
+                  <span className="text-sm font-medium text-slate-700">원</span>
                 </div>
               </div>
             ))}

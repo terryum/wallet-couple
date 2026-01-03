@@ -77,12 +77,15 @@ src/
 │   ├── dashboard/          # 차트 컴포넌트 (DashboardPageContent)
 │   ├── transactions/       # 거래 컴포넌트 (TransactionPageContent)
 │   ├── layout/             # 공통 레이아웃 (SharedHeader, SharedBottomNav)
+│   ├── Providers.tsx       # 전역 프로바이더 (QueryClient, AppContext)
+│   ├── DataPrefetcher.tsx  # 앱 레벨 프리페칭 (성능 최적화)
 │   ├── settings/           # 설정 컴포넌트
 │   └── ui/                 # shadcn/ui
 ├── constants/              # 상수 정의
 │   ├── colors.ts           # 디자인 시스템 색상 (핵심)
 │   └── chart.ts            # 차트 관련 상수
 ├── hooks/                  # React Query 훅
+│   └── useDashboard.ts     # 대시보드 데이터 훅 + 프리페칭
 ├── lib/
 │   ├── classifier/         # AI 카테고리 분류
 │   ├── loaders/            # 카드사/은행 파서

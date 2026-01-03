@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatNumber, formatYearMonth, formatManwon } from '@/lib/utils/format';
 import { CategoryPopup } from './CategoryPopup';
 import { getCategoryColor } from '@/constants/chart';
-import { incomeChartColors, expenseChartColors, transaction } from '@/constants/colors';
+import { transaction } from '@/constants/colors';
 import type { Category, TransactionType } from '@/types';
 
 interface CategoryData {
@@ -42,8 +42,7 @@ interface ChartEntry {
 
 function prepareChartData(
   data: CategoryData[],
-  total: number,
-  colorMap: Record<string, string>
+  total: number
 ): ChartEntry[] {
   if (total === 0) return [];
 
@@ -53,7 +52,7 @@ function prepareChartData(
     .map((d) => ({
       name: d.category,
       value: d.total_amount,
-      color: colorMap[d.category] || '#94A3B8',
+      color: getCategoryColor(d.category),
       percentage: (d.total_amount / total) * 100,
     }));
 }
@@ -72,8 +71,8 @@ export function DualPieChartCard({
   const [incomeExpanded, setIncomeExpanded] = useState(false);
   const [expenseExpanded, setExpenseExpanded] = useState(false);
 
-  const incomeChartData = prepareChartData(incomeData, incomeTotal, incomeChartColors);
-  const expenseChartData = prepareChartData(expenseData, expenseTotal, expenseChartColors);
+  const incomeChartData = prepareChartData(incomeData, incomeTotal);
+  const expenseChartData = prepareChartData(expenseData, expenseTotal);
 
   const balance = incomeTotal - expenseTotal;
 
@@ -199,16 +198,18 @@ export function DualPieChartCard({
                     소득 없음
                   </div>
                 )}
-                {/* 중앙 총액 */}
-                <div
-                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center cursor-pointer"
-                  onClick={() => handleCategoryClick('전체', 'income')}
-                >
-                  <p className="text-[10px] text-emerald-600 font-medium">소득</p>
-                  <p className="text-xs font-bold text-slate-900">
-                    {formatManwon(incomeTotal)}
-                  </p>
-                </div>
+                {/* 중앙 총액 - 데이터 있을 때만 표시 */}
+                {incomeChartData.length > 0 && (
+                  <div
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center cursor-pointer"
+                    onClick={() => handleCategoryClick('전체', 'income')}
+                  >
+                    <p className="text-[10px] text-emerald-600 font-medium">소득</p>
+                    <p className="text-xs font-bold text-slate-900">
+                      {formatManwon(incomeTotal)}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -246,99 +247,108 @@ export function DualPieChartCard({
                     지출 없음
                   </div>
                 )}
-                {/* 중앙 총액 */}
-                <div
-                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center cursor-pointer"
-                  onClick={() => handleCategoryClick('전체', 'expense')}
-                >
-                  <p className="text-[10px] text-blue-600 font-medium">지출</p>
-                  <p className="text-xs font-bold text-slate-900">
-                    {formatManwon(expenseTotal)}
-                  </p>
-                </div>
+                {/* 중앙 총액 - 데이터 있을 때만 표시 */}
+                {expenseChartData.length > 0 && (
+                  <div
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center cursor-pointer"
+                    onClick={() => handleCategoryClick('전체', 'expense')}
+                  >
+                    <p className="text-[10px] text-blue-600 font-medium">지출</p>
+                    <p className="text-xs font-bold text-slate-900">
+                      {formatManwon(expenseTotal)}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* 카테고리별 드롭다운 */}
-          <div className="mt-3 pt-3 border-t border-slate-100 space-y-2 px-2">
-            {/* 소득 드롭다운 */}
-            {incomeChartData.length > 0 && (
-              <div>
+          {/* 카테고리별 드롭다운 - 나란히 배치 */}
+          <div className="mt-3 pt-3 border-t border-slate-100 px-2">
+            {/* 헤더: 소득/지출 나란히 */}
+            <div className="flex gap-2">
+              {/* 소득 드롭다운 */}
+              <div className="flex-1 min-w-0">
                 <button
                   onClick={() => setIncomeExpanded(!incomeExpanded)}
-                  className="w-full flex items-center justify-between py-1.5 hover:bg-slate-50 rounded-lg transition-colors"
+                  className="w-full flex items-center justify-between py-1.5 hover:bg-slate-50 rounded-lg transition-colors px-1"
                 >
-                  <span className="text-xs font-medium text-emerald-600">소득 상세</span>
-                  {incomeExpanded ? (
-                    <ChevronUp className="w-4 h-4 text-emerald-500" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-emerald-500" />
-                  )}
+                  <span className="text-sm font-medium text-emerald-600">소득</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-medium text-slate-900 tabular-nums">{formatManwon(incomeTotal)}</span>
+                    {incomeExpanded ? (
+                      <ChevronUp className="w-3 h-3 text-emerald-500" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3 text-emerald-500" />
+                    )}
+                  </div>
                 </button>
                 {incomeExpanded && (
-                  <div className="mt-1 space-y-1 pl-2">
-                    {incomeChartData.map((entry) => (
+                  <div className="mt-1 space-y-1">
+                    {incomeChartData.slice(0, 5).map((entry) => (
                       <div
                         key={entry.name}
                         className="flex items-center justify-between text-xs py-1 cursor-pointer hover:bg-slate-50 rounded px-1"
                         onClick={() => handleCategoryClick(entry.name, 'income')}
                       >
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1 min-w-0">
                           <div
-                            className="w-2 h-2 rounded-full"
+                            className="w-2 h-2 rounded-full shrink-0"
                             style={{ backgroundColor: entry.color }}
                           />
-                          <span className="text-slate-600">{entry.name}</span>
+                          <span className="text-slate-600 truncate">{entry.name}</span>
                         </div>
-                        <span className="text-slate-800 font-medium">
-                          {formatNumber(entry.value)}원 ({entry.percentage.toFixed(0)}%)
-                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-slate-900 font-medium tabular-nums">{formatManwon(entry.value)}</span>
+                          <span className="text-slate-400 text-[10px] w-7 text-right">{entry.percentage.toFixed(0)}%</span>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-            )}
 
-            {/* 지출 드롭다운 */}
-            {expenseChartData.length > 0 && (
-              <div>
+              {/* 지출 드롭다운 */}
+              <div className="flex-1 min-w-0">
                 <button
                   onClick={() => setExpenseExpanded(!expenseExpanded)}
-                  className="w-full flex items-center justify-between py-1.5 hover:bg-slate-50 rounded-lg transition-colors"
+                  className="w-full flex items-center justify-between py-1.5 hover:bg-slate-50 rounded-lg transition-colors px-1"
                 >
-                  <span className="text-xs font-medium text-blue-600">지출 상세</span>
-                  {expenseExpanded ? (
-                    <ChevronUp className="w-4 h-4 text-blue-500" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-blue-500" />
-                  )}
+                  <span className="text-sm font-medium text-blue-600">지출</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-medium text-slate-900 tabular-nums">{formatManwon(expenseTotal)}</span>
+                    {expenseExpanded ? (
+                      <ChevronUp className="w-3 h-3 text-blue-500" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3 text-blue-500" />
+                    )}
+                  </div>
                 </button>
                 {expenseExpanded && (
-                  <div className="mt-1 space-y-1 pl-2">
-                    {expenseChartData.map((entry) => (
+                  <div className="mt-1 space-y-1">
+                    {expenseChartData.slice(0, 5).map((entry) => (
                       <div
                         key={entry.name}
                         className="flex items-center justify-between text-xs py-1 cursor-pointer hover:bg-slate-50 rounded px-1"
                         onClick={() => handleCategoryClick(entry.name, 'expense')}
                       >
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1 min-w-0">
                           <div
-                            className="w-2 h-2 rounded-full"
+                            className="w-2 h-2 rounded-full shrink-0"
                             style={{ backgroundColor: entry.color }}
                           />
-                          <span className="text-slate-600">{entry.name}</span>
+                          <span className="text-slate-600 truncate">{entry.name}</span>
                         </div>
-                        <span className="text-slate-800 font-medium">
-                          {formatNumber(entry.value)}원 ({entry.percentage.toFixed(0)}%)
-                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="text-slate-900 font-medium tabular-nums">{formatManwon(entry.value)}</span>
+                          <span className="text-slate-400 text-[10px] w-7 text-right">{entry.percentage.toFixed(0)}%</span>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
         </CardContent>
       </Card>

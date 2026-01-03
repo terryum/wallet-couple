@@ -19,6 +19,7 @@
 | **공통 컴포넌트** | TransactionPageContent, DashboardPageContent |
 | **디자인 시스템** | 토스 스타일 블루 기반 색상 시스템 |
 | **가계분석 통합** | 소득/지출 통합 분석 (IncomeExpenseBarCard) |
+| **앱 레벨 프리페칭** | DataPrefetcher로 초기 로딩 최적화 |
 
 ### 지원 소스 타입
 
@@ -36,47 +37,57 @@
 
 ## 최근 작업 (2026-01-03)
 
-### 가계분석 탭 통합 ✅
+### 1. UI 개선 ✅
 
-#### 통합 차트 구조 (IncomeExpenseBarCard)
+#### DualPieChartCard (가계분석 도넛차트)
+- 드롭다운 아이콘(▼/▲) 위치: 금액 오른쪽으로 이동 (`소득 ... 00만원 ▼`)
+- 색상 통일: `getCategoryColor()` 함수로 모든 컴포넌트 색상 일관성 확보
+- 데이터 없을 때 중앙 라벨 숨김
+- 드롭다운 카테고리 클릭 시 CategoryPopup 오픈
+
+#### IncomeExpenseBarCard (추세 차트)
+- "00월 소득/지출" 섹션에 전월 대비 증감 표시 `(+00만원)` 회색, 작은 글자
+- 손익 표시 (+00만원 초록/파랑) 삭제 → 증감만 표시
+
+#### SummaryCard (이번 달 총 소득/지출)
+- "(+00만)" 색상: 모두 회색 (`text-slate-400`)
+- "(+00만)" 위치: 라벨 옆으로 이동
+- 헤더와 드롭다운 항목 크기 통일 (`text-[10px]`)
+
+### 2. React Hooks 버그 수정 ✅
+
+#### CategoryPopup 훅 순서 오류 수정
+- **문제:** `if (!isOpen || !category) return null;` 이후에 `useCallback`, `useModalBackHandler` 호출
+- **해결:** 모든 훅을 조건부 return 이전으로 이동
+
+### 3. 성능 최적화 - 앱 레벨 프리페칭 ✅
+
+#### 문제 분석
+- `usePrefetchDashboardData`가 TransactionPageContent(지출 탭)에서만 호출
+- 사용자가 가계분석 탭 직접 방문 시 프리페칭 미실행
+- 가계분석 탭은 소득+지출 동시 로딩 + 추세 데이터(6개월) 필요로 느림
+
+#### 해결책: DataPrefetcher 컴포넌트 생성
+
 ```
-"월별 소득/지출 변화" (메인 카드)
-├── 헤더: 제목 + 기간 선택 (3/6/12/직접입력) ← 공유
-│
-├── "소득/지출 분석" 섹션
-│   └── 소득 막대(↑) + 지출 막대(↓) + 손익선
-│   └── 선택된 월 요약
-│
-└── "카테고리 분석" 섹션
-    ├── 1줄: [전체 소득] [급여] [상여] ... (초록색)
-    ├── 2줄: [전체 지출] [식료품] [외식] ... (파란색)
-    └── 막대 차트 (위쪽 방향) + 합계 표시
+src/components/DataPrefetcher.tsx (신규)
+src/components/Providers.tsx (수정)
 ```
 
-#### 핵심 변경사항
-- **월 동기화:** selectedMonth 변경 시 모든 차트가 해당 월을 끝월로 사용
-- **손익선 확장:** 전후 1개월 추가 조회하여 경계에서 잘린 효과
-- **색상 통일:** 지출=파랑 (`#3182F6`), 소득=초록 (`#059669`)
-- **CategoryTrendCard 통합:** 별도 컴포넌트 제거, IncomeExpenseBarCard에 통합
+**프리페칭 전략:**
 
-#### 수정된 파일
-- `src/hooks/useDashboard.ts` - endMonth 파라미터, includeExtended 옵션 추가
-- `src/components/dashboard/IncomeExpenseBarCard.tsx` - 통합 차트로 리팩토링
-- `src/components/dashboard/HouseholdDashboardContent.tsx` - CategoryTrendCard 제거
-- `src/components/dashboard/index.ts` - CategoryTrendCard export 제거
-- `src/components/dashboard/CategoryTrendCard.tsx` - 삭제
+| 단계 | 시점 | 프리페칭 대상 |
+|------|------|-------------|
+| 1단계 | 즉시 | 현재 월 지출 데이터 (최고 우선순위) |
+| 2단계 | 100ms | 현재 월 소득 데이터 |
+| 3단계 | 300ms | 이전 2개월 소득/지출 데이터 |
+| 4단계 | 500ms | 가계분석용 8개월, 14개월 추세 데이터 |
+| 5단계 | 800ms | 다음 월 데이터 (월 이동 대비) |
 
-### 색상 규칙 정립 ✅
-
-#### 변동 표시 색상 (좋음/나쁨)
-| 항목 | 증가 | 감소 |
-|------|------|------|
-| 소득 | 🟢 초록 (좋음) | 🔵 파랑 (나쁨) |
-| 지출 | 🔵 파랑 (나쁨) | 🟢 초록 (좋음) |
-
-#### SummaryCard 수정
-- `getIncomeDiffColor`: 증가=초록, 감소=파랑
-- `getExpenseDiffColor`: 증가=파랑, 감소=초록
+**효과:**
+- 앱 접속 즉시 지출 탭 데이터 로딩
+- 백그라운드에서 다른 탭 데이터 미리 로딩
+- 가계분석 탭 클릭 시 캐시된 데이터로 즉시 표시
 
 ---
 
@@ -84,13 +95,22 @@
 
 ### 디자인 시스템
 - **단일 소스:** `src/constants/colors.ts`에서 모든 색상 관리
-- **지출/소득 색상 분리:** 지출(파랑), 소득(초록) - 혼동 방지
-- **CSS 변수:** `globals.css`에 `--color-brand`, `--color-expense`, `--color-income` 등
+- **지출/소득 색상 분리:** 지출(파랑 `#3182F6`), 소득(초록 `#059669`)
+- **색상 함수:** `getCategoryColor()` - 모든 컴포넌트에서 동일 색상 사용
 
 ### 컴포넌트 구조
 - **페이지:** 최소 코드 (props만 전달)
 - **공통 컴포넌트:** `TransactionPageContent`, `DashboardPageContent`, `IncomeExpenseBarCard`
-- **색상 함수:** `getCategoryColor()`, `getBadgeColorClass()`
+- **프리페칭:** `DataPrefetcher` (Providers에서 렌더링)
+
+### 프리페칭 구조
+```
+Providers
+├── QueryClientProvider
+│   └── AppProvider
+│       ├── DataPrefetcher (앱 레벨 프리페칭)
+│       └── {children}
+```
 
 ### 가계분석 데이터 흐름
 ```
@@ -102,6 +122,19 @@ IncomeExpenseBarCard
 ├── 소득/지출 분석 (ComposedChart)
 └── 카테고리 분석 (BarChart)
 ```
+
+---
+
+## 수정된 파일 목록
+
+### 이번 세션
+- `src/components/dashboard/DualPieChartCard.tsx` - UI 개선, 색상 통일
+- `src/components/dashboard/IncomeExpenseBarCard.tsx` - 증감 표시, 손익 제거
+- `src/components/dashboard/CategoryPopup.tsx` - 훅 순서 수정
+- `src/components/transactions/SummaryCard.tsx` - 레이아웃 개선
+- `src/components/Providers.tsx` - DataPrefetcher 통합
+- `src/components/DataPrefetcher.tsx` - 신규 생성
+- `src/components/transactions/TransactionPageContent.tsx` - 중복 프리페칭 제거
 
 ---
 

@@ -100,14 +100,10 @@ export function CategoryPopup({
     [editFlow]
   );
 
-  if (!isOpen || !category) return null;
-
-  const displayName = category;
-
   // EditModal 또는 SimilarTransactionsModal이 열려있으면 overlay 클릭 비활성화
   const isSubModalOpen = editFlow.isSubModalOpen;
 
-  // 뒤로가기 버튼 처리
+  // 뒤로가기 버튼 처리 - hooks는 조건부 return 전에 호출되어야 함
   const handleClose = useCallback(() => onClose(), [onClose]);
   useModalBackHandler({
     isOpen,
@@ -124,6 +120,10 @@ export function CategoryPopup({
     },
     [isSubModalOpen, onClose]
   );
+
+  if (!isOpen || !category) return null;
+
+  const displayName = category;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>

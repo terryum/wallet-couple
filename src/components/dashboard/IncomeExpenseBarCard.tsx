@@ -1,5 +1,5 @@
 /**
- * 월별 소득/지출 변화 통합 차트
+ * 소득/지출 추세 통합 차트
  *
  * 섹션 1: 소득/지출 분석
  *   - 소득 막대 (위) + 지출 막대 (아래) + 손익선
@@ -60,6 +60,9 @@ export function IncomeExpenseBarCard({
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customValue, setCustomValue] = useState('');
   const customInputRef = useRef<HTMLInputElement>(null);
+
+  // 클릭한 월 (그래프 내에서 선택)
+  const [clickedMonth, setClickedMonth] = useState<string | null>(null);
 
   // 카테고리 분석용 상태 (기본값: 전체 지출)
   const [categorySelection, setCategorySelection] = useState<CategorySelection>({
@@ -155,23 +158,38 @@ export function IncomeExpenseBarCard({
     return [0, maxValue * 1.1];
   }, [categoryChartData]);
 
-  // X축 틱 렌더링 (확장 데이터 숨김)
+  // X축 틱 렌더링 (확장 데이터 숨김, 클릭 가능)
   const renderXAxisTick = (props: { x: number; y: number; payload: { value: string; index: number } }) => {
     const { x, y, payload } = props;
     const dataPoint = filteredData[payload.index];
     if (dataPoint?.isExtended) return null;
     return (
-      <text x={x} y={y + 12} textAnchor="middle" fontSize={11} fill="#64748B">
+      <text
+        x={x}
+        y={y + 12}
+        textAnchor="middle"
+        fontSize={11}
+        fill="#64748B"
+        className="cursor-pointer hover:fill-slate-900"
+        onClick={() => dataPoint?.fullMonth && handleChartClick(dataPoint.fullMonth)}
+      >
         {payload.value}
       </text>
     );
   };
 
-  // 선택된 월 데이터
+  // 선택된 월 데이터 (클릭한 월 우선, 없으면 headerMonth)
+  const displayMonth = clickedMonth || headerMonth;
   const selectedMonthData = useMemo(() => {
-    if (!headerMonth) return null;
-    return data.find((d) => d.fullMonth === headerMonth);
-  }, [data, headerMonth]);
+    if (!displayMonth) return null;
+    return data.find((d) => d.fullMonth === displayMonth);
+  }, [data, displayMonth]);
+
+  // 막대/노드 클릭 핸들러
+  const handleChartClick = (fullMonth: string) => {
+    setClickedMonth(fullMonth);
+    onMonthClick?.(fullMonth);
+  };
 
   // 현재 선택된 카테고리 색상 (지출=파랑, 소득=초록)
   const getCategorySelectionColor = () => {
@@ -212,7 +230,7 @@ export function IncomeExpenseBarCard({
     return (
       <Card className="rounded-2xl">
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium">월별 소득/지출 변화</CardTitle>
+          <CardTitle className="text-base font-medium">소득/지출 추세</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-[200px] text-slate-400">
@@ -227,7 +245,7 @@ export function IncomeExpenseBarCard({
     <Card className="rounded-2xl">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-medium">월별 소득/지출 변화</CardTitle>
+          <CardTitle className="text-base font-medium">소득/지출 추세</CardTitle>
           {/* 기간 선택 (공유) */}
           <div className="flex gap-1 items-center">
             {(['3', '6', '12'] as PresetPeriod[]).map((p) => (
@@ -316,23 +334,6 @@ export function IncomeExpenseBarCard({
                   tickFormatter={(v) => `${Math.abs(v / 10000).toFixed(0)}`}
                 />
                 <ReferenceLine y={0} stroke="#CBD5E1" strokeWidth={1} />
-                <Tooltip
-                  formatter={(value, name) => {
-                    const numValue = typeof value === 'number' ? value : 0;
-                    const absValue = Math.abs(numValue);
-                    const label =
-                      name === 'income' ? '소득' :
-                      name === 'negativeExpense' ? '지출' : '손익';
-                    return [formatNumber(absValue) + '원', label];
-                  }}
-                  labelFormatter={(label) => `${label}`}
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                  }}
-                />
                 <Legend
                   wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
                   formatter={(value) => {
@@ -349,7 +350,7 @@ export function IncomeExpenseBarCard({
                   maxBarSize={24}
                   onClick={(barData) => {
                     const payload = barData?.payload as { fullMonth?: string } | undefined;
-                    if (payload?.fullMonth) onMonthClick?.(payload.fullMonth);
+                    if (payload?.fullMonth) handleChartClick(payload.fullMonth);
                   }}
                   className="cursor-pointer"
                 />
@@ -360,7 +361,7 @@ export function IncomeExpenseBarCard({
                   maxBarSize={24}
                   onClick={(barData) => {
                     const payload = barData?.payload as { fullMonth?: string } | undefined;
-                    if (payload?.fullMonth) onMonthClick?.(payload.fullMonth);
+                    if (payload?.fullMonth) handleChartClick(payload.fullMonth);
                   }}
                   className="cursor-pointer"
                 />
@@ -374,37 +375,71 @@ export function IncomeExpenseBarCard({
                     const dataPoint = mainChartData[index];
                     if (dataPoint?.isExtended) return <></>;
                     return (
-                      <circle cx={cx} cy={cy} r={3} fill={transaction.balance} stroke="none" />
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={4}
+                        fill={transaction.balance}
+                        stroke="none"
+                        className="cursor-pointer"
+                        onClick={() => dataPoint?.fullMonth && handleChartClick(dataPoint.fullMonth)}
+                        style={{ pointerEvents: 'all' }}
+                      />
                     );
                   }}
-                  activeDot={{ r: 5 }}
+                  activeDot={(props) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const { cx, cy, index } = props as any;
+                    const dataPoint = mainChartData[index];
+                    return (
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={6}
+                        fill={transaction.balance}
+                        stroke="white"
+                        strokeWidth={2}
+                        className="cursor-pointer"
+                        onClick={() => dataPoint?.fullMonth && handleChartClick(dataPoint.fullMonth)}
+                        style={{ pointerEvents: 'all' }}
+                      />
+                    );
+                  }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
 
-          {/* 선택된 월 요약 */}
-          {selectedMonthData && (
-            <div className="mt-3 pt-3 border-t border-slate-100 px-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">{selectedMonthData.month} 요약</span>
-                <div className="flex gap-4">
-                  <span style={{ color: transaction.income }}>
-                    소득 {formatManwon(selectedMonthData.income)}
-                  </span>
-                  <span style={{ color: transaction.expense }}>
-                    지출 {formatManwon(selectedMonthData.expense)}
-                  </span>
-                  <span
-                    className="font-medium"
-                    style={{ color: selectedMonthData.balance >= 0 ? transaction.income : transaction.expense }}
-                  >
-                    {selectedMonthData.balance >= 0 ? '+' : ''}{formatManwon(selectedMonthData.balance)}
-                  </span>
+          {/* 선택된 월 소득/지출 */}
+          {selectedMonthData && (() => {
+            // 이전 월 데이터 찾기
+            const currentIndex = data.findIndex((d) => d.fullMonth === displayMonth);
+            const prevMonthData = currentIndex > 0 ? data[currentIndex - 1] : null;
+            const balanceDiff = prevMonthData
+              ? selectedMonthData.balance - prevMonthData.balance
+              : null;
+
+            return (
+              <div className="mt-3 pt-3 border-t border-slate-100 px-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">{selectedMonthData.month} 소득/지출</span>
+                  <div className="flex gap-3 items-baseline">
+                    <span style={{ color: transaction.income }}>
+                      소득 {formatManwon(selectedMonthData.income)}
+                    </span>
+                    <span style={{ color: transaction.expense }}>
+                      지출 {formatManwon(selectedMonthData.expense)}
+                    </span>
+                    {balanceDiff !== null && balanceDiff !== 0 && (
+                      <span className="text-[10px] text-slate-400">
+                        ({balanceDiff > 0 ? '+' : ''}{formatManwon(balanceDiff)})
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* ===== 섹션 2: 카테고리 분석 ===== */}
