@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { PieChart, TrendingDown, TrendingUp, LineChart } from 'lucide-react';
 import { transaction, brand } from '@/constants/colors';
+import { useAppContext, type TabType } from '@/contexts/AppContext';
 
 // 거래 유형별 색상 (colors.ts에서 중앙 관리)
 const EXPENSE_COLOR = transaction.expense; // #FF5252
@@ -25,6 +26,14 @@ interface NavTab {
 
 export function SharedBottomNav() {
   const pathname = usePathname();
+  const { setActiveTab, notifyUserAction } = useAppContext();
+
+  // 탭 클릭 핸들러 - 프리페칭 우선순위 조정
+  const handleTabClick = (href: string) => {
+    const tabName = href.replace('/', '') as TabType;
+    setActiveTab(tabName);
+    notifyUserAction(); // 프리페칭 일시 중단하고 사용자 요청 우선
+  };
 
   const tabs: NavTab[] = [
     {
@@ -68,6 +77,7 @@ export function SharedBottomNav() {
               <Link
                 key={tab.href}
                 href={tab.href}
+                onClick={() => handleTabClick(tab.href)}
                 className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 rounded-lg transition-all ${
                   active ? 'bg-white shadow-sm' : 'text-slate-500'
                 }`}

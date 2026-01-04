@@ -39,7 +39,8 @@ interface MultiMonthData {
 async function fetchMonthlyAggregation(
   month: string,
   owner?: Owner,
-  transactionType: TransactionType = 'expense'
+  transactionType: TransactionType = 'expense',
+  signal?: AbortSignal
 ): Promise<MonthlyAggregationResponse> {
   const params = new URLSearchParams();
   params.set('month', month);
@@ -47,7 +48,7 @@ async function fetchMonthlyAggregation(
   params.set('transaction_type', transactionType);
   if (owner) params.set('owner', owner);
 
-  const res = await fetch(`/api/transactions?${params.toString()}`);
+  const res = await fetch(`/api/transactions?${params.toString()}`, { signal });
   if (!res.ok) {
     throw new Error('데이터를 불러오는데 실패했습니다.');
   }
@@ -70,11 +71,12 @@ async function fetchMonthlyAggregation(
 async function fetchMultiMonthAggregation(
   months: string[],
   owner?: Owner,
-  transactionType: TransactionType = 'expense'
+  transactionType: TransactionType = 'expense',
+  signal?: AbortSignal
 ): Promise<MultiMonthData[]> {
   const results = await Promise.all(
     months.map(async (month) => {
-      const data = await fetchMonthlyAggregation(month, owner, transactionType);
+      const data = await fetchMonthlyAggregation(month, owner, transactionType, signal);
       return {
         month,
         total: data.total,
@@ -116,7 +118,7 @@ export function useMonthlyAggregation(
 
   return useQuery({
     queryKey: ['dashboard', 'monthly', month, owner, transactionType],
-    queryFn: () => fetchMonthlyAggregation(month, owner, transactionType),
+    queryFn: ({ signal }) => fetchMonthlyAggregation(month, owner, transactionType, signal),
     staleTime: 1000 * 60 * 5,
     placeholderData: (previousData) => previousData,
   });
@@ -137,7 +139,7 @@ export function useMultiMonthAggregation(
   return useQuery({
     // 캐시 키에서 endMonth 제거 → 월 변경해도 캐시 히트
     queryKey: ['dashboard', 'trend', monthCount, owner, transactionType],
-    queryFn: () => fetchMultiMonthAggregation(months, owner, transactionType),
+    queryFn: ({ signal }) => fetchMultiMonthAggregation(months, owner, transactionType, signal),
     staleTime: 1000 * 60 * 5,
   });
 }

@@ -19,7 +19,7 @@ import {
 import { SharedHeader, SharedBottomNav } from '@/components/layout';
 import { SearchBar, FilterPanel } from '@/components/search';
 import { useAppContext } from '@/contexts/AppContext';
-import { useTransactions, useDeleteTransaction } from '@/hooks/useTransactions';
+import { useTransactions, useInfiniteTransactions, useDeleteTransaction } from '@/hooks/useTransactions';
 import {
   useSearchTransactions,
   isSearchActive,
@@ -94,14 +94,24 @@ export function TransactionPageContent({
     transactionType: 'all',
   });
 
-  // 선택된 카테고리 데이터 조회
-  const { data, isLoading } = useTransactions({
-    month: selectedMonth,
-    owner: selectedOwner || undefined,
-    category: (selectedCategory as Category) || undefined,
-    includeSummary: true,
-    transactionType,
-  });
+  // 선택된 카테고리 데이터 조회 (무한 스크롤)
+  const {
+    data: infiniteData,
+    isLoading,
+    hasNextPage,
+    isFetchingNextPage,
+    loadMore,
+    totalCount,
+  } = useInfiniteTransactions(
+    {
+      month: selectedMonth,
+      owner: selectedOwner || undefined,
+      category: (selectedCategory as Category) || undefined,
+      includeSummary: true,
+      transactionType,
+    },
+    { pageSize: 30 } // 첫 로드 시 30건만
+  );
 
   // 검색 데이터 조회 (검색 활성화 시)
   const { data: searchData, isLoading: searchLoading } = useSearchTransactions(
@@ -167,8 +177,8 @@ export function TransactionPageContent({
     if (searchActive) {
       return searchData?.data || [];
     }
-    return data?.data || [];
-  }, [searchActive, searchData, data]);
+    return infiniteData || [];
+  }, [searchActive, searchData, infiniteData]);
 
   // 로딩 상태
   const transactionsLoading = searchActive ? searchLoading : isLoading;
@@ -389,6 +399,10 @@ export function TransactionPageContent({
             onLongPress={handleLongPress}
             onDelete={handleDelete}
             onUploadClick={handleUploadClick}
+            hasNextPage={!searchActive && hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={loadMore}
+            totalCount={!searchActive ? totalCount : undefined}
           />
         </div>
       </div>

@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState, useMemo, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { DualPieChartCard } from './DualPieChartCard';
 import { IncomeExpenseBarCard } from './IncomeExpenseBarCard';
@@ -20,12 +20,34 @@ import type { Transaction, Category } from '@/types';
 
 export function HouseholdDashboardContent() {
   const fileUploaderRef = useRef<FileUploaderRef>(null);
+  const billingCardRef = useRef<HTMLDivElement>(null);
 
   // 전역 상태
   const { selectedMonth, selectedOwner, currentUser } = useAppContext();
 
   // 기간 상태 (기본 3개월 - 빠른 초기 로딩)
   const [period, setPeriod] = useState<string>('3');
+
+  // BillingComparisonCard lazy loading
+  const [billingVisible, setBillingVisible] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setBillingVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100px' }
+    );
+
+    if (billingCardRef.current) {
+      observer.observe(billingCardRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
 
   const editFlow = useTransactionEditFlow({
     owner: currentUser,
@@ -126,8 +148,14 @@ export function HouseholdDashboardContent() {
             onPeriodChange={setPeriod}
           />
 
-          {/* 월별 청구금액 비교 */}
-          <BillingComparisonCard />
+          {/* 월별 청구금액 비교 - Intersection Observer로 lazy load */}
+          <div ref={billingCardRef}>
+            {billingVisible ? (
+              <BillingComparisonCard />
+            ) : (
+              <div className="h-48 bg-white rounded-2xl animate-pulse" />
+            )}
+          </div>
         </div>
       </div>
 

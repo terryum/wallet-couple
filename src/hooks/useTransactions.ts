@@ -47,7 +47,8 @@ interface FetchTransactionsParams extends TransactionQueryParams {
 
 /** 거래 내역 조회 */
 async function fetchTransactions(
-  params: FetchTransactionsParams
+  params: FetchTransactionsParams,
+  signal?: AbortSignal
 ): Promise<TransactionsResponse> {
   const searchParams = new URLSearchParams();
   searchParams.set('month', params.month);
@@ -59,7 +60,7 @@ async function fetchTransactions(
   if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
   if (params.offset !== undefined) searchParams.set('offset', String(params.offset));
 
-  const res = await fetch(`/api/transactions?${searchParams.toString()}`);
+  const res = await fetch(`/api/transactions?${searchParams.toString()}`, { signal });
   if (!res.ok) {
     throw new Error('거래 내역을 불러오는데 실패했습니다.');
   }
@@ -159,7 +160,7 @@ export function useTransactions(
 
   return useQuery({
     queryKey: ['transactions', params],
-    queryFn: () => fetchTransactions(params),
+    queryFn: ({ signal }) => fetchTransactions(params, signal),
     staleTime: 1000 * 60 * 5, // 5분
     placeholderData: (previousData) => previousData, // 로딩 중 이전 데이터 유지
     enabled, // 팝업 열릴 때만 fetch
@@ -227,12 +228,12 @@ export function useInfiniteTransactions(
 
   const query = useInfiniteQuery({
     queryKey: ['transactions', 'infinite', params],
-    queryFn: async ({ pageParam = 0 }) => {
+    queryFn: async ({ pageParam = 0, signal }) => {
       return fetchTransactions({
         ...params,
         limit: pageSize,
         offset: pageParam,
-      });
+      }, signal);
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {

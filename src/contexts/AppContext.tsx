@@ -7,7 +7,11 @@
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import { getLastMonth, getAdjacentMonth } from '@/lib/utils/date';
+import { getPrefetchManager } from '@/lib/prefetch';
 import type { Owner } from '@/types';
+
+/** 탭 타입 */
+export type TabType = 'expense' | 'income' | 'household' | 'investment';
 
 interface AppContextType {
   selectedMonth: string;
@@ -19,6 +23,11 @@ interface AppContextType {
   /** 현재 로그인된 사용자 */
   currentUser: Owner;
   setCurrentUser: (user: Owner) => void;
+  /** 현재 활성 탭 */
+  activeTab: TabType;
+  setActiveTab: (tab: TabType) => void;
+  /** 사용자 액션 알림 (프리페칭 우선순위 조정) */
+  notifyUserAction: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -27,6 +36,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [selectedMonth, setSelectedMonth] = useState(getLastMonth);
   const [selectedOwner, setSelectedOwner] = useState<Owner | null>(null);
   const [currentUser, setCurrentUser] = useState<Owner>('husband');
+  const [activeTab, setActiveTab] = useState<TabType>('expense');
 
   const goToPrevMonth = useCallback(() => {
     setSelectedMonth((m) => getAdjacentMonth(m, -1));
@@ -34,6 +44,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const goToNextMonth = useCallback(() => {
     setSelectedMonth((m) => getAdjacentMonth(m, 1));
+  }, []);
+
+  // 사용자 액션 알림 - 프리페칭 일시 중단
+  const notifyUserAction = useCallback(() => {
+    const manager = getPrefetchManager();
+    manager.notifyUserAction(500); // 500ms 동안 프리페칭 일시 중단
   }, []);
 
   return (
@@ -47,6 +63,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setSelectedOwner,
         currentUser,
         setCurrentUser,
+        activeTab,
+        setActiveTab,
+        notifyUserAction,
       }}
     >
       {children}
