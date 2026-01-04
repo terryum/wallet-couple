@@ -13,7 +13,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { getPrefetchManager } from '@/lib/prefetch';
 import { getAdjacentMonth, getRecentMonths, getCurrentYearMonth } from '@/lib/utils/date';
 
-/** 월별 집계 데이터 fetch 함수 */
+/** 월별 집계 데이터 fetch 함수 (프리페칭용 - 낮은 우선순위) */
 async function fetchMonthlyAggregation(
   month: string,
   owner?: string,
@@ -26,7 +26,10 @@ async function fetchMonthlyAggregation(
   params.set('transaction_type', transactionType);
   if (owner) params.set('owner', owner);
 
-  const res = await fetch(`/api/transactions?${params.toString()}`, { signal });
+  const res = await fetch(`/api/transactions?${params.toString()}`, {
+    signal,
+    priority: 'low' as RequestPriority,  // 프리페칭은 낮은 우선순위
+  });
   if (!res.ok) {
     throw new Error('데이터를 불러오는데 실패했습니다.');
   }
@@ -106,7 +109,10 @@ export function DataPrefetcher() {
       queryClient.prefetchQuery({
         queryKey: ['transactions', queryParams],
         queryFn: async ({ signal }) => {
-          const res = await fetch(`/api/transactions?${params.toString()}`, { signal });
+          const res = await fetch(`/api/transactions?${params.toString()}`, {
+            signal,
+            priority: 'low' as RequestPriority,  // 프리페칭은 낮은 우선순위
+          });
           if (!res.ok) throw new Error('Failed to fetch');
           return res.json();
         },
@@ -138,22 +144,27 @@ export function DataPrefetcher() {
     const nextMonth = getAdjacentMonth(selectedMonth, 1);
 
     // ==========================================
-    // 1단계: 현재 탭 핵심 데이터 (즉시)
+    // 1단계: 현재 탭 핵심 데이터 (50ms 지연 - 사용자 네비게이션 우선)
     // ==========================================
-    if (activeTab === 'household') {
-      // 가계분석 탭: 도넛차트 + 막대그래프
-      prefetchTransactions(selectedMonth, 'all', true);
-      prefetchTrend(5, 'expense');
-      prefetchTrend(5, 'income');
-    } else if (activeTab === 'expense') {
-      // 지출 탭
-      prefetchTransactions(selectedMonth, 'expense', true);
-      prefetchMonthly(selectedMonth, 'expense');
-    } else if (activeTab === 'income') {
-      // 소득 탭
-      prefetchTransactions(selectedMonth, 'income', true);
-      prefetchMonthly(selectedMonth, 'income');
-    }
+    const phase1TimerId = setTimeout(() => {
+      // 사용자 액션으로 일시 중단된 경우 스킵
+      if (manager.paused) return;
+
+      if (activeTab === 'household') {
+        // 가계분석 탭: 도넛차트 + 막대그래프
+        prefetchTransactions(selectedMonth, 'all', true);
+        prefetchTrend(5, 'expense');
+        prefetchTrend(5, 'income');
+      } else if (activeTab === 'expense') {
+        // 지출 탭
+        prefetchTransactions(selectedMonth, 'expense', true);
+        prefetchMonthly(selectedMonth, 'expense');
+      } else if (activeTab === 'income') {
+        // 소득 탭
+        prefetchTransactions(selectedMonth, 'income', true);
+        prefetchMonthly(selectedMonth, 'income');
+      }
+    }, 50);
 
     // ==========================================
     // 2단계: 인접 월 데이터 (idle - high priority)
@@ -213,6 +224,7 @@ export function DataPrefetcher() {
 
     // cleanup
     return () => {
+      clearTimeout(phase1TimerId);
       manager.cancelScheduled();
     };
   }, [

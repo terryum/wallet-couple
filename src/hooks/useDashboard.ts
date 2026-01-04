@@ -35,7 +35,7 @@ interface MultiMonthData {
   byCategory: CategoryAggregation[];
 }
 
-/** 월별 집계 데이터 조회 */
+/** 월별 집계 데이터 조회 (사용자 요청 - 높은 우선순위) */
 async function fetchMonthlyAggregation(
   month: string,
   owner?: Owner,
@@ -48,7 +48,10 @@ async function fetchMonthlyAggregation(
   params.set('transaction_type', transactionType);
   if (owner) params.set('owner', owner);
 
-  const res = await fetch(`/api/transactions?${params.toString()}`, { signal });
+  const res = await fetch(`/api/transactions?${params.toString()}`, {
+    signal,
+    priority: 'high' as RequestPriority,  // 사용자 요청은 높은 우선순위
+  });
   if (!res.ok) {
     throw new Error('데이터를 불러오는데 실패했습니다.');
   }

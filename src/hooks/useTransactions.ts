@@ -45,7 +45,7 @@ interface FetchTransactionsParams extends TransactionQueryParams {
   offset?: number;
 }
 
-/** 거래 내역 조회 */
+/** 거래 내역 조회 (사용자 요청 - 높은 우선순위) */
 async function fetchTransactions(
   params: FetchTransactionsParams,
   signal?: AbortSignal
@@ -60,7 +60,10 @@ async function fetchTransactions(
   if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
   if (params.offset !== undefined) searchParams.set('offset', String(params.offset));
 
-  const res = await fetch(`/api/transactions?${searchParams.toString()}`, { signal });
+  const res = await fetch(`/api/transactions?${searchParams.toString()}`, {
+    signal,
+    priority: 'high' as RequestPriority,  // 사용자 요청은 높은 우선순위
+  });
   if (!res.ok) {
     throw new Error('거래 내역을 불러오는데 실패했습니다.');
   }

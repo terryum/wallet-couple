@@ -76,11 +76,15 @@ export class PrefetchManager {
   }
 
   /**
-   * 사용자 액션 알림 - 프리페칭 일시 중단
+   * 사용자 액션 알림 - 프리페칭 즉시 취소 및 일시 중단
    * @param pauseDuration 중단 시간 (ms), 기본 500ms
    */
   notifyUserAction(pauseDuration = 500): void {
     this.isPaused = true;
+
+    // ★ 핵심: 진행 중인 프리페칭 즉시 취소하여 네트워크 대역폭 확보
+    this.cancelScheduled();  // 스케줄된 prefetch 취소
+    this.abortInFlight();    // 진행 중인 fetch 취소
 
     // 기존 pause timeout 취소
     if (this.pauseTimeout) {
