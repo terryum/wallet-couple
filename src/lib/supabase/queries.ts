@@ -21,15 +21,32 @@ export interface QueryResult<T> {
   error: string | null;
 }
 
+/** 페이지네이션 포함 거래 내역 결과 */
+export interface TransactionQueryResult {
+  data: Transaction[];
+  totalCount: number;
+  hasMore: boolean;
+}
+
 /**
  * 거래 내역 조회 (월별)
  * @param params.transactionType - 'expense' | 'income' | 'all' (기본: 'expense')
+ * @param params.limit - 반환할 최대 건수 (기본: 전체)
+ * @param params.offset - 건너뛸 건수 (기본: 0)
  */
 export async function getTransactions(
   params: TransactionQueryParams
-): Promise<QueryResult<Transaction[]>> {
+): Promise<QueryResult<TransactionQueryResult>> {
   try {
-    const { month, sort = 'date_desc', category, owner, transactionType = 'expense' } = params;
+    const {
+      month,
+      sort = 'date_desc',
+      category,
+      owner,
+      transactionType = 'expense',
+      limit,
+      offset = 0,
+    } = params;
 
     // 월의 시작일과 종료일 계산
     const startDate = `${month}-01`;
@@ -40,7 +57,7 @@ export async function getTransactions(
 
     let query = supabase
       .from('transactions')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('is_deleted', false)
       .gte('transaction_date', startDate)
       .lte('transaction_date', endDate);
@@ -75,13 +92,28 @@ export async function getTransactions(
         break;
     }
 
-    const { data, error } = await query;
+    // 페이지네이션 적용
+    if (limit !== undefined && limit > 0) {
+      query = query.range(offset, offset + limit - 1);
+    }
+
+    const { data, error, count } = await query;
 
     if (error) {
       return { data: null, error: error.message };
     }
 
-    return { data: data as Transaction[], error: null };
+    const totalCount = count || 0;
+    const hasMore = limit !== undefined ? offset + limit < totalCount : false;
+
+    return {
+      data: {
+        data: data as Transaction[],
+        totalCount,
+        hasMore,
+      },
+      error: null,
+    };
   } catch (err) {
     return { data: null, error: String(err) };
   }

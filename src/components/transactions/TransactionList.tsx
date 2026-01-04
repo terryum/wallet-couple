@@ -24,6 +24,14 @@ interface TransactionListProps {
   emptyMessage?: string;
   /** 빈 상태일 때 표시할 설명 */
   emptyDescription?: string;
+  /** 무한 스크롤: 다음 페이지 존재 여부 */
+  hasNextPage?: boolean;
+  /** 무한 스크롤: 다음 페이지 로딩 중 */
+  isFetchingNextPage?: boolean;
+  /** 무한 스크롤: 다음 페이지 로드 함수 */
+  onLoadMore?: () => void;
+  /** 전체 거래 건수 (무한 스크롤용) */
+  totalCount?: number;
 }
 
 /** 스켈레톤 로딩 UI */
@@ -119,6 +127,10 @@ export function TransactionList({
   onUploadClick,
   emptyMessage,
   emptyDescription,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
+  totalCount,
 }: TransactionListProps) {
   // 정렬 상태
   const [sortColumn, setSortColumn] = useState<SortColumn>('date');
@@ -233,6 +245,33 @@ export function TransactionList({
           onDelete={onDelete}
         />
       ))}
+
+      {/* 무한 스크롤: 더보기 버튼 */}
+      {hasNextPage && onLoadMore && (
+        <div className="flex flex-col items-center py-4 border-t border-slate-100">
+          {totalCount !== undefined && (
+            <p className="text-xs text-slate-400 mb-2">
+              {transactions.length}건 / {totalCount}건
+            </p>
+          )}
+          <button
+            onClick={onLoadMore}
+            disabled={isFetchingNextPage}
+            className="px-6 py-2 text-sm font-medium text-[#3182F6] bg-blue-50 rounded-xl hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isFetchingNextPage ? '로딩 중...' : '더보기'}
+          </button>
+        </div>
+      )}
+
+      {/* 무한 스크롤: 다음 페이지 로딩 중 스켈레톤 */}
+      {isFetchingNextPage && (
+        <div className="border-t border-slate-100">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <TransactionSkeleton key={`loading-${i}`} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

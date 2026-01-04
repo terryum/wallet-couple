@@ -10,7 +10,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '@/contexts/AppContext';
-import { getAdjacentMonth, getRecentMonths } from '@/lib/utils/date';
+import { getAdjacentMonth, getRecentMonths, getCurrentYearMonth } from '@/lib/utils/date';
 import { PREFETCH_DELAY } from '@/constants/timing';
 
 /** 월별 집계 데이터 fetch 함수 */
@@ -76,14 +76,17 @@ export function DataPrefetcher() {
       });
     };
 
+    // 추세 데이터 프리페칭 (고정 endMonth 사용 - 캐시 최적화)
     const prefetchTrend = (
       monthCount: number,
-      transactionType: 'expense' | 'income',
-      endMonth: string
+      transactionType: 'expense' | 'income'
     ) => {
-      const months = getRecentMonths(monthCount, endMonth);
+      // 현재 시스템 월 기준으로 고정 (캐시 키 안정화)
+      const fixedEndMonth = getCurrentYearMonth();
+      const months = getRecentMonths(monthCount, fixedEndMonth);
       queryClient.prefetchQuery({
-        queryKey: ['dashboard', 'trend', monthCount, owner, transactionType, endMonth],
+        // 캐시 키에서 endMonth 제거 → 월 변경해도 캐시 히트
+        queryKey: ['dashboard', 'trend', monthCount, owner, transactionType],
         queryFn: () => fetchMultiMonthAggregation(months, owner, transactionType),
         staleTime: 1000 * 60 * 5,
       });
@@ -119,7 +122,6 @@ export function DataPrefetcher() {
       });
     };
 
-    const extendedEndMonth = getAdjacentMonth(selectedMonth, 1);
     const prev1Month = getAdjacentMonth(selectedMonth, -1);
     const prev2Month = getAdjacentMonth(selectedMonth, -2);
     const nextMonth = getAdjacentMonth(selectedMonth, 1);
@@ -127,9 +129,10 @@ export function DataPrefetcher() {
     // 1단계: 가계분석 탭 데이터 즉시 프리페칭 (최우선)
     // - 현재 월 도넛차트용 (소득+지출 통합)
     prefetchTransactions(selectedMonth, 'all', true);
-    // - 막대차트용 추세 데이터 (14개월 = 12 + 확장 2개월)
-    prefetchTrend(14, 'expense', extendedEndMonth);
-    prefetchTrend(14, 'income', extendedEndMonth);
+    // - 막대차트용 추세 데이터 (26개월 = 24개월 + 확장 2개월)
+    // - 고정 캐시 키 사용 → 월 변경해도 캐시 히트
+    prefetchTrend(26, 'expense');
+    prefetchTrend(26, 'income');
 
     // 2단계: 현재 월 소득/지출 + 이전 1개월 가계분석 데이터
     setTimeout(() => {
@@ -145,15 +148,7 @@ export function DataPrefetcher() {
       prefetchMonthly(prev1Month, 'income');
     }, PREFETCH_DELAY.FAST);
 
-    // 3단계: 기간 변경 대비 추세 데이터 (8개월, 16개월)
-    setTimeout(() => {
-      prefetchTrend(8, 'expense', extendedEndMonth);
-      prefetchTrend(8, 'income', extendedEndMonth);
-      prefetchTrend(16, 'expense', extendedEndMonth);
-      prefetchTrend(16, 'income', extendedEndMonth);
-    }, PREFETCH_DELAY.NORMAL);
-
-    // 4단계: 2개월 전 데이터 + 다음 월 데이터
+    // 3단계: 2개월 전 데이터 + 다음 월 데이터
     setTimeout(() => {
       // 2개월 전 가계분석 도넛차트용
       prefetchTransactions(prev2Month, 'all', true);
@@ -164,7 +159,7 @@ export function DataPrefetcher() {
       prefetchTransactions(nextMonth, 'all', true);
       prefetchMonthly(nextMonth, 'expense');
       prefetchMonthly(nextMonth, 'income');
-    }, PREFETCH_DELAY.SLOW);
+    }, PREFETCH_DELAY.NORMAL);
 
     initialPrefetchDone.current = true;
   }, [selectedMonth, selectedOwner, queryClient]);

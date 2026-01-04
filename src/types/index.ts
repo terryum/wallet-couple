@@ -149,6 +149,10 @@ export interface TransactionQueryParams {
   owner?: Owner;
   /** 거래 유형 필터: 'expense' | 'income' | 'all' (기본: 'expense') */
   transactionType?: TransactionType | 'all';
+  /** 페이지네이션: 반환할 최대 건수 */
+  limit?: number;
+  /** 페이지네이션: 건너뛸 건수 */
+  offset?: number;
 }
 
 /** 대시보드 집계 데이터 */

@@ -8,7 +8,7 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Category, Owner, TransactionType } from '@/types';
 import { mapSummaryToAggregation } from '@/lib/dashboard/transform';
-import { getAdjacentMonth, getRecentMonths as getRecentMonthsUtil } from '@/lib/utils/date';
+import { getAdjacentMonth, getRecentMonths as getRecentMonthsUtil, getCurrentYearMonth } from '@/lib/utils/date';
 
 /** 월별 카테고리 집계 */
 interface CategoryAggregation {
@@ -122,17 +122,21 @@ export function useMonthlyAggregation(
   });
 }
 
-/** 여러 월 집계 훅 (추세 분석용) */
+/** 여러 월 집계 훅 (추세 분석용) - 고정된 endMonth 사용으로 캐시 재사용 */
 export function useMultiMonthAggregation(
   monthCount: number,
   owner?: Owner,
   transactionType: TransactionType = 'expense',
   endMonth?: string
 ) {
-  const months = getRecentMonths(monthCount, endMonth);
+  // 고정된 endMonth 사용: 현재 시스템 월 기준 (캐시 키 안정화)
+  // endMonth 파라미터는 하위 호환성을 위해 유지하지만, 캐시 키에는 사용하지 않음
+  const fixedEndMonth = getCurrentYearMonth();
+  const months = getRecentMonths(monthCount, fixedEndMonth);
 
   return useQuery({
-    queryKey: ['dashboard', 'trend', monthCount, owner, transactionType, endMonth],
+    // 캐시 키에서 endMonth 제거 → 월 변경해도 캐시 히트
+    queryKey: ['dashboard', 'trend', monthCount, owner, transactionType],
     queryFn: () => fetchMultiMonthAggregation(months, owner, transactionType),
     staleTime: 1000 * 60 * 5,
   });
@@ -188,21 +192,22 @@ export interface CombinedMonthData {
   isExtended?: boolean; // 확장 데이터 여부 (손익선 연장용)
 }
 
-/** 소득+지출 여러 월 집계 훅 */
+/** 소득+지출 여러 월 집계 훅 (캐시 최적화 버전)
+ * - 항상 26개월 데이터를 로드하여 캐시 재사용률 극대화
+ * - selectedMonth는 클라이언트 슬라이싱에만 사용 (IncomeExpenseBarCard에서 처리)
+ */
 export function useMultiMonthBothAggregation(
   monthCount: number,
   owner?: Owner,
-  endMonth?: string,
-  includeExtended?: boolean // 손익선 연장을 위한 전후 1개월 포함
+  _endMonth?: string,           // 하위 호환성 유지 (실제로는 사용하지 않음)
+  _includeExtended?: boolean    // 하위 호환성 유지 (항상 true로 동작)
 ) {
-  // 확장 데이터 포함 시 전후 1개월씩 추가 조회
-  const extendedCount = includeExtended ? monthCount + 2 : monthCount;
-  const extendedEndMonth = includeExtended && endMonth
-    ? getAdjacentMonth(endMonth, 1)
-    : endMonth;
+  // 항상 26개월 데이터 로드 (24개월 + 확장 2개월)
+  // 캐시 키가 고정되어 월 변경 시에도 캐시 히트
+  const FIXED_MONTH_COUNT = 26;
 
-  const incomeQuery = useMultiMonthAggregation(extendedCount, owner, 'income', extendedEndMonth);
-  const expenseQuery = useMultiMonthAggregation(extendedCount, owner, 'expense', extendedEndMonth);
+  const incomeQuery = useMultiMonthAggregation(FIXED_MONTH_COUNT, owner, 'income');
+  const expenseQuery = useMultiMonthAggregation(FIXED_MONTH_COUNT, owner, 'expense');
 
   const combinedData: CombinedMonthData[] = [];
 
@@ -210,9 +215,6 @@ export function useMultiMonthBothAggregation(
     for (let i = 0; i < incomeQuery.data.length; i++) {
       const incomeMonth = incomeQuery.data[i];
       const expenseMonth = expenseQuery.data[i];
-
-      // 확장 데이터인지 표시 (첫 번째와 마지막)
-      const isExtended = includeExtended && (i === 0 || i === incomeQuery.data.length - 1);
 
       combinedData.push({
         month: `${parseInt(incomeMonth.month.slice(5))}월`,
@@ -222,7 +224,7 @@ export function useMultiMonthBothAggregation(
         balance: incomeMonth.total - (expenseMonth?.total || 0),
         incomeByCategory: incomeMonth.byCategory,
         expenseByCategory: expenseMonth?.byCategory || [],
-        isExtended,
+        isExtended: false, // 클라이언트에서 슬라이싱 후 결정
       });
     }
   }

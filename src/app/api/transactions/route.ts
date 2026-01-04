@@ -29,6 +29,8 @@ import { formatNumber } from '@/lib/utils/format';
  * - category: 카테고리 필터
  * - owner: husband | wife
  * - include_summary: true면 집계 데이터도 포함
+ * - limit: 반환할 최대 건수 (기본: 전체)
+ * - offset: 건너뛸 건수 (기본: 0)
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -40,6 +42,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const owner = searchParams.get('owner') as Owner | null;
     const includeSummary = searchParams.get('include_summary') === 'true';
     const transactionType = searchParams.get('transaction_type') as TransactionType | 'all' | null;
+    const limitStr = searchParams.get('limit');
+    const offsetStr = searchParams.get('offset');
 
     // 월 필수 검증
     if (!month) {
@@ -72,6 +76,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // 페이지네이션 파라미터 파싱
+    const limit = limitStr ? parseInt(limitStr, 10) : undefined;
+    const offset = offsetStr ? parseInt(offsetStr, 10) : 0;
+
     // 거래 내역 조회
     const params: TransactionQueryParams = {
       month,
@@ -79,6 +87,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       category: category || undefined,
       owner: owner || undefined,
       transactionType: transactionType || undefined,
+      limit,
+      offset,
     };
 
     const result = await fetchTransactionsWithSummary(params, includeSummary);
@@ -96,6 +106,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       count: result.data?.length || 0,
       month,
       summary: result.summary,
+      pagination: result.pagination,
     });
   } catch (err) {
     return NextResponse.json(

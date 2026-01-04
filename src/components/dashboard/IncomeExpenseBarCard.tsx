@@ -95,15 +95,37 @@ export function IncomeExpenseBarCard({
   // 미리 정의된 기간인지 확인
   const isPresetPeriod = ['3', '6', '12'].includes(period);
 
-  // 기간에 따른 데이터 필터링 (확장 데이터 포함)
+  // 기간에 따른 데이터 필터링 (headerMonth 기준 클라이언트 슬라이싱)
+  // - 26개월 전체 데이터에서 headerMonth 기준 period개월만 추출
+  // - 손익선 확장을 위해 전후 1개월씩 추가 (isExtended 표시)
   const filteredData = useMemo(() => {
-    const count = parseInt(period);
-    const hasExtended = data.some((d) => d.isExtended);
-    if (hasExtended) {
-      return data.slice(-(count + 2));
-    }
-    return data.slice(-count);
-  }, [data, period]);
+    if (!data || data.length === 0) return [];
+
+    const count = parseInt(period) || 6;
+
+    // headerMonth의 인덱스 찾기 (없으면 마지막 데이터 사용)
+    const selectedIndex = headerMonth
+      ? data.findIndex((d) => d.fullMonth === headerMonth)
+      : data.length - 1;
+
+    // 유효한 인덱스가 아니면 마지막 데이터 기준
+    const endIndex = selectedIndex >= 0 ? selectedIndex : data.length - 1;
+
+    // 시작 인덱스 계산 (확장 1개월 포함)
+    const startIndex = Math.max(0, endIndex - count - 1 + 1); // count개월 + 앞 1개월
+
+    // 종료 인덱스 계산 (확장 1개월 포함)
+    const extendedEndIndex = Math.min(data.length - 1, endIndex + 1);
+
+    // 슬라이싱
+    const sliced = data.slice(startIndex, extendedEndIndex + 1);
+
+    // isExtended 표시 (첫 번째와 마지막)
+    return sliced.map((d, i) => ({
+      ...d,
+      isExtended: i === 0 || i === sliced.length - 1,
+    }));
+  }, [data, period, headerMonth]);
 
   // 소득/지출 분석용 차트 데이터 (지출을 음수로)
   const mainChartData = useMemo(() => {

@@ -77,14 +77,13 @@ export function HouseholdDashboardContent() {
     };
   }, [allData]);
 
-  // 추세 데이터 (최대 24개월 - 직접입력 지원, 손익선 확장 포함)
-  const maxPeriod = Math.max(parseInt(period) || 6, 12);
+  // 추세 데이터 - 26개월 전체 데이터를 1회 로드 (캐시 최적화)
+  // selectedMonth 기준 슬라이싱은 IncomeExpenseBarCard에서 클라이언트 사이드로 처리
   const { data: trendData, isLoading: isLoadingTrend } =
     useMultiMonthBothAggregation(
-      Math.min(maxPeriod, 24),
-      selectedOwner || undefined,
-      selectedMonth,  // 선택된 월을 끝월로 사용
-      true            // 손익선 확장을 위해 전후 1개월 추가 조회
+      26,  // 고정: 24개월 + 확장 2개월
+      selectedOwner || undefined
+      // endMonth, includeExtended 파라미터는 더 이상 사용하지 않음 (캐시 최적화)
     );
 
   // 업로드 버튼 클릭

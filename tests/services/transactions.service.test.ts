@@ -19,7 +19,7 @@ describe('transactions.service', () => {
   });
 
   it('returns data without summary when includeSummary is false', async () => {
-    const data: Transaction[] = [
+    const transactions: Transaction[] = [
       {
         id: '1',
         transaction_date: '2025-12-01',
@@ -35,19 +35,31 @@ describe('transactions.service', () => {
         created_at: '2025-12-01T00:00:00Z',
       },
     ];
-    mockedRepo.getTransactions.mockResolvedValue({ data, error: null });
+    mockedRepo.getTransactions.mockResolvedValue({
+      data: { data: transactions, totalCount: 1, hasMore: false },
+      error: null,
+    });
 
     const result = await fetchTransactionsWithSummary(
       { month: '2025-12' },
       false
     );
 
-    expect(result.data).toEqual(data);
+    expect(result.data).toEqual(transactions);
     expect(result.summary).toBeNull();
+    expect(result.pagination).toEqual({
+      totalCount: 1,
+      hasMore: false,
+      limit: undefined,
+      offset: 0,
+    });
   });
 
   it('returns summary when includeSummary is true', async () => {
-    mockedRepo.getTransactions.mockResolvedValue({ data: [], error: null });
+    mockedRepo.getTransactions.mockResolvedValue({
+      data: { data: [], totalCount: 0, hasMore: false },
+      error: null,
+    });
     mockedRepo.fetchMonthlyTotal.mockResolvedValue({ data: 3000, error: null });
     mockedRepo.fetchMonthlyAggregation.mockResolvedValue({
       data: [{ category: '기타', total: 3000, count: 2 }],
@@ -60,6 +72,7 @@ describe('transactions.service', () => {
     );
 
     expect(result.summary?.total).toBe(3000);
+    expect(result.summary?.totalCount).toBe(2);
     expect(result.summary?.byCategory).toEqual([
       { category: '기타', total: 3000, count: 2 },
     ]);

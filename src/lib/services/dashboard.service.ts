@@ -6,6 +6,7 @@ import {
 
 export interface MonthlySummary {
   total: number;
+  totalCount: number;
   byCategory: { category: Category; total: number; count: number }[];
 }
 
@@ -19,8 +20,13 @@ export async function fetchMonthlySummary(
     fetchMonthlyAggregation(month, owner, transactionType),
   ]);
 
+  const byCategory = aggregationResult.data || [];
+  // totalCount는 각 카테고리의 count 합계
+  const totalCount = byCategory.reduce((sum, cat) => sum + cat.count, 0);
+
   return {
     total: totalResult.data || 0,
-    byCategory: aggregationResult.data || [],
+    totalCount,
+    byCategory,
   };
 }
