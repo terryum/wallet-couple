@@ -12,6 +12,7 @@ import {
   type ChartCategoryData,
   type CategoryCalculationResult,
 } from '@/constants/chart';
+import { safePercentage } from '@/lib/utils/math';
 
 interface UseCategoryCalculationOptions {
   minCategories?: number;
@@ -63,11 +64,11 @@ export function useCategoryCalculation(
     const topItems = sorted.slice(0, numCategories);
     const etcItems = sorted.slice(numCategories);
 
-    // 차트 데이터 생성
+    // 차트 데이터 생성 - safePercentage로 NaN 방지
     const chartData: ChartCategoryData[] = topItems.map((item) => ({
       name: item.category,
       value: item.total_amount,
-      percentage: (item.total_amount / total) * 100,
+      percentage: safePercentage(item.total_amount, total),
       color: getCategoryColor(item.category),
       count: item.count,
     }));
@@ -80,7 +81,7 @@ export function useCategoryCalculation(
       chartData.push({
         name: 'etc.',
         value: etcTotal,
-        percentage: (etcTotal / total) * 100,
+        percentage: safePercentage(etcTotal, total),
         color: getCategoryColor('etc.'),
         count: etcCount,
       });

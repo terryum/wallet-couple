@@ -11,6 +11,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatNumber, formatYearMonth, formatManwon } from '@/lib/utils/format';
+import { safePercentage } from '@/lib/utils/math';
 import { CategoryPopup } from './CategoryPopup';
 import { getCategoryColor } from '@/constants/chart';
 import { transaction } from '@/constants/colors';
@@ -53,7 +54,7 @@ function prepareChartData(
       name: d.category,
       value: d.total_amount,
       color: getCategoryColor(d.category),
-      percentage: (d.total_amount / total) * 100,
+      percentage: safePercentage(d.total_amount, total),
     }));
 }
 

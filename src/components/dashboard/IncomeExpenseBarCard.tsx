@@ -28,6 +28,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatNumber, formatManwon } from '@/lib/utils/format';
+import { safeYAxisDomain } from '@/lib/utils/math';
 import { transaction } from '@/constants/colors';
 import { ALL_EXPENSE_CATEGORIES, INCOME_CATEGORIES, type Category } from '@/types';
 import type { CombinedMonthData } from '@/hooks/useDashboard';
@@ -140,22 +141,17 @@ export function IncomeExpenseBarCard({
     });
   }, [filteredData, categorySelection]);
 
-  // Y축 범위 계산 (메인 차트)
+  // Y축 범위 계산 (메인 차트) - safeYAxisDomain으로 NaN/빈 배열 방어
   const mainYAxisDomain = useMemo(() => {
-    if (filteredData.length === 0) return [-1000000, 1000000];
-    const maxIncome = Math.max(...filteredData.map((d) => d.income));
-    const maxExpense = Math.max(...filteredData.map((d) => d.expense));
-    const maxBalance = Math.max(...filteredData.map((d) => Math.abs(d.balance)));
-    const maxValue = Math.max(maxIncome, maxExpense, maxBalance) * 1.1;
+    const allValues = filteredData.flatMap((d) => [d.income, d.expense, Math.abs(d.balance)]);
+    const [, maxValue] = safeYAxisDomain(allValues, 1.1, 1000000);
     return [-maxValue, maxValue];
   }, [filteredData]);
 
-  // Y축 범위 계산 (카테고리 차트)
+  // Y축 범위 계산 (카테고리 차트) - safeYAxisDomain으로 NaN/빈 배열 방어
   const categoryYAxisDomain = useMemo(() => {
     const amounts = categoryChartData.map((d) => d.amount).filter((a): a is number => a !== null);
-    if (amounts.length === 0) return [0, 100000];
-    const maxValue = Math.max(...amounts);
-    return [0, maxValue * 1.1];
+    return safeYAxisDomain(amounts, 1.1, 100000);
   }, [categoryChartData]);
 
   // X축 틱 렌더링 (확장 데이터 숨김, 클릭 가능)

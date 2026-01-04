@@ -10,28 +10,8 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '@/contexts/AppContext';
-
-/** 이전/다음 월 계산 */
-function getAdjacentMonth(yearMonth: string, delta: number): string {
-  const [year, month] = yearMonth.split('-').map(Number);
-  const date = new Date(year, month - 1 + delta, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
-
-/** 최근 N개월 목록 생성 */
-function getRecentMonths(count: number, endMonth: string): string[] {
-  const months: string[] = [];
-  const [endYear, endMonthNum] = endMonth.split('-').map(Number);
-
-  for (let i = 0; i < count; i++) {
-    const date = new Date(endYear, endMonthNum - 1 - i, 1);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    months.push(`${year}-${month}`);
-  }
-
-  return months.reverse();
-}
+import { getAdjacentMonth, getRecentMonths } from '@/lib/utils/date';
+import { PREFETCH_DELAY } from '@/constants/timing';
 
 /** 월별 집계 데이터 fetch 함수 */
 async function fetchMonthlyAggregation(
@@ -134,7 +114,7 @@ export function DataPrefetcher() {
     setTimeout(() => {
       prefetchMonthly(selectedMonth, 'income');
       prefetchTransactions(selectedMonth, 'income');
-    }, 100);
+    }, PREFETCH_DELAY.FAST);
 
     // 3단계: 이전 2개월 데이터 (백그라운드)
     setTimeout(() => {
@@ -147,7 +127,7 @@ export function DataPrefetcher() {
         prefetchMonthly(month, 'expense');
         prefetchMonthly(month, 'income');
       });
-    }, 300);
+    }, PREFETCH_DELAY.NORMAL);
 
     // 4단계: 가계분석 탭용 추세 데이터 (손익선 확장 포함: 8개월)
     setTimeout(() => {
@@ -158,14 +138,14 @@ export function DataPrefetcher() {
       // 12개월 추세도 프리페칭
       prefetchTrend(14, 'expense', extendedEndMonth);
       prefetchTrend(14, 'income', extendedEndMonth);
-    }, 500);
+    }, PREFETCH_DELAY.SLOW);
 
     // 5단계: 다음 월 데이터도 프리페칭 (월 이동 대비)
     setTimeout(() => {
       const nextMonth = getAdjacentMonth(selectedMonth, 1);
       prefetchMonthly(nextMonth, 'expense');
       prefetchMonthly(nextMonth, 'income');
-    }, 800);
+    }, PREFETCH_DELAY.BACKGROUND);
 
     initialPrefetchDone.current = true;
   }, [selectedMonth, selectedOwner, queryClient]);

@@ -28,7 +28,7 @@ export function SharedBottomNav() {
 
   const tabs: NavTab[] = [
     {
-      href: '/',
+      href: '/expense',
       label: '지출',
       icon: <TrendingDown className="w-4 h-4" />,
       activeColor: EXPENSE_COLOR,

@@ -1,19 +1,10 @@
 /**
- * 메인 페이지 - 지출 내역 화면
- * TransactionPageContent 공통 컴포넌트 사용
+ * 메인 페이지 - 가계분석 탭으로 리다이렉트
+ * 사용자가 처음 접근 시 지난달 가계분석 화면을 보여줌
  */
 
-'use client';
-
-import { TransactionPageContent } from '@/components/transactions';
-import { ALL_EXPENSE_CATEGORIES } from '@/types';
+import { redirect } from 'next/navigation';
 
 export default function HomePage() {
-  return (
-    <TransactionPageContent
-      transactionType="expense"
-      categories={ALL_EXPENSE_CATEGORIES}
-      modalIdBase="home"
-    />
-  );
+  redirect('/household');
 }

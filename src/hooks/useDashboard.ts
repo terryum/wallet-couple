@@ -8,13 +8,7 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Category, Owner, TransactionType } from '@/types';
 import { mapSummaryToAggregation } from '@/lib/dashboard/transform';
-
-/** 이전/다음 월 계산 */
-function getAdjacentMonth(yearMonth: string, delta: number): string {
-  const [year, month] = yearMonth.split('-').map(Number);
-  const date = new Date(year, month - 1 + delta, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
+import { getAdjacentMonth, getRecentMonths as getRecentMonthsUtil } from '@/lib/utils/date';
 
 /** 월별 카테고리 집계 */
 interface CategoryAggregation {
@@ -92,30 +86,8 @@ async function fetchMultiMonthAggregation(
   return results;
 }
 
-/** 최근 N개월 목록 생성 (endMonth 기준) */
-export function getRecentMonths(count: number, endMonth?: string): string[] {
-  const months: string[] = [];
-
-  let endYear: number;
-  let endMonthNum: number;
-
-  if (endMonth) {
-    [endYear, endMonthNum] = endMonth.split('-').map(Number);
-  } else {
-    const now = new Date();
-    endYear = now.getFullYear();
-    endMonthNum = now.getMonth() + 1;
-  }
-
-  for (let i = 0; i < count; i++) {
-    const date = new Date(endYear, endMonthNum - 1 - i, 1);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    months.push(`${year}-${month}`);
-  }
-
-  return months.reverse(); // 오래된 순서로
-}
+/** 최근 N개월 목록 생성 (endMonth 기준) - date.ts에서 re-export */
+export const getRecentMonths = getRecentMonthsUtil;
 
 /** 월별 카테고리 집계 훅 (인접 월 프리페칭 포함) */
 export function useMonthlyAggregation(

@@ -1,6 +1,6 @@
 # Current_Status.md
 
-마지막 업데이트: 2026-01-03
+마지막 업데이트: 2026-01-04
 
 ## 현재 구현 상태
 
@@ -20,6 +20,8 @@
 | **디자인 시스템** | 토스 스타일 블루 기반 색상 시스템 |
 | **가계분석 통합** | 소득/지출 통합 분석 (IncomeExpenseBarCard) |
 | **앱 레벨 프리페칭** | DataPrefetcher로 초기 로딩 최적화 |
+| **유틸리티 모듈화** | math.ts, date.ts로 중복 제거 |
+| **queryKey 팩토리** | queryKeys.ts로 일관성 확보 |
 
 ### 지원 소스 타입
 
@@ -35,7 +37,63 @@
 
 ---
 
-## 최근 작업 (2026-01-03)
+## 최근 작업 (2026-01-04)
+
+### 클린 아키텍처 리팩토링 ✅
+
+#### Phase 1: NaN 버그 수정
+
+**신규 파일:** `src/lib/utils/math.ts`
+- `safePercentage()`: 안전한 백분율 계산 (0으로 나누기 방지)
+- `safeYAxisDomain()`: 차트 Y축 범위 계산 (빈 배열/NaN 방지)
+- `safeDivide()`, `safePercentChange()`: 추가 유틸리티
+
+**수정된 파일:**
+- `IncomeExpenseBarCard.tsx`: Y축 범위 계산 안전화
+- `DualPieChartCard.tsx`: 백분율 계산 안전화
+- `useCategoryCalculation.ts`: 백분율 계산 안전화
+
+#### Phase 2: 상수 중앙화
+
+**신규 파일:**
+- `src/constants/timing.ts`: 프리페칭 지연 시간 상수
+- `src/constants/categories.ts`: 카테고리 그룹 상수
+
+#### Phase 3: 코드 중복 제거
+
+**신규 파일:**
+- `src/lib/utils/date.ts`: 날짜/월 계산 유틸리티 (중복 제거)
+  - `getAdjacentMonth()`, `getRecentMonths()`, `getLastMonth()` 등
+- `src/components/common/FloatingActionButtons.tsx`: 플로팅 버튼 공통 컴포넌트
+- `src/hooks/queryKeys.ts`: React Query 키 팩토리 (일관성 확보)
+
+**수정된 파일 (중복 제거):**
+- `AppContext.tsx`: date.ts 사용
+- `DataPrefetcher.tsx`: date.ts + timing.ts 사용
+- `useDashboard.ts`: date.ts 사용
+- `useTransactions.ts`: date.ts 사용
+
+### 테스트 결과
+- **169개 테스트 모두 통과** ✅
+- 타입 체크 통과 ✅
+
+---
+
+## 이전 작업 (2026-01-03)
+
+### 0. 초기 화면 변경 ✅
+
+#### 기본 월 변경
+- **이전:** 이번 달 (예: 2026-01)
+- **이후:** 지난 달 (예: 2025-12)
+- `AppContext.tsx`: `getCurrentYearMonth()` → `getLastMonth()`
+
+#### 첫 화면 변경
+- **이전:** 지출 탭 (`/`)
+- **이후:** 가계분석 탭 (`/household`)
+- `page.tsx`: 지출 내역 → `/household` 리다이렉트
+- `expense/page.tsx`: 새로운 지출 페이지 생성
+- `SharedBottomNav.tsx`: 지출 탭 href `/` → `/expense`
 
 ### 1. UI 개선 ✅
 
@@ -139,6 +197,11 @@ IncomeExpenseBarCard
 ---
 
 ## 다음 단계 (계획)
+
+### 리팩토링 남은 작업 (선택)
+- 하드코딩 색상 교체 (19개 파일에서 `#3182F6` → `brand`)
+- 대형 컴포넌트 분할 (StackedBarCard 744줄, IncomeExpenseBarCard 597줄)
+- FloatingActionButtons 적용 (3개 파일에서 기존 코드 교체)
 
 ### Step 1: 투자 UI (더미데이터)
 - 확정 수익 (배당, 매도차익)

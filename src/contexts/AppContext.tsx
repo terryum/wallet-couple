@@ -6,22 +6,8 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { getLastMonth, getAdjacentMonth } from '@/lib/utils/date';
 import type { Owner } from '@/types';
-
-/** 현재 년월 가져오기 */
-function getCurrentYearMonth(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
-}
-
-/** 이전/다음 월 계산 */
-function adjustMonth(yearMonth: string, delta: number): string {
-  const [year, month] = yearMonth.split('-').map(Number);
-  const date = new Date(year, month - 1 + delta, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
 
 interface AppContextType {
   selectedMonth: string;
@@ -38,16 +24,16 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentYearMonth);
+  const [selectedMonth, setSelectedMonth] = useState(getLastMonth);
   const [selectedOwner, setSelectedOwner] = useState<Owner | null>(null);
   const [currentUser, setCurrentUser] = useState<Owner>('husband');
 
   const goToPrevMonth = useCallback(() => {
-    setSelectedMonth((m) => adjustMonth(m, -1));
+    setSelectedMonth((m) => getAdjacentMonth(m, -1));
   }, []);
 
   const goToNextMonth = useCallback(() => {
-    setSelectedMonth((m) => adjustMonth(m, 1));
+    setSelectedMonth((m) => getAdjacentMonth(m, 1));
   }, []);
 
   return (

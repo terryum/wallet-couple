@@ -13,13 +13,7 @@ import type {
   CreateTransactionDto,
   Category,
 } from '@/types';
-
-/** 이전/다음 월 계산 */
-function getAdjacentMonth(yearMonth: string, delta: number): string {
-  const [year, month] = yearMonth.split('-').map(Number);
-  const date = new Date(year, month - 1 + delta, 1);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-}
+import { getAdjacentMonth } from '@/lib/utils/date';
 
 /** 거래 내역 조회 응답 타입 */
 interface TransactionsResponse {
