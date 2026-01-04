@@ -50,22 +50,25 @@ function aggregateBilling(rows: BillingFileRow[]): Record<string, number> {
 
 export async function getBillingComparison(monthCount: number): Promise<{ data: MonthlyBilling[]; error: string | null }> {
   const months = buildMonths(monthCount);
-  const result: MonthlyBilling[] = [];
 
-  for (const month of months) {
+  // 모든 월의 데이터를 병렬로 조회 (성능 최적화: 순차 → 병렬)
+  const monthDataPromises = months.map(async (month) => {
     const startDate = `${month}-01`;
     const [year, monthNum] = month.split('-').map(Number);
     const lastDay = new Date(year, monthNum, 0).getDate();
     const endDate = `${month}-${String(lastDay).padStart(2, '0')}`;
 
-    const usageResult = await fetchUsageByDateRange(startDate, endDate);
-    if (usageResult.error) {
-      return { data: [], error: usageResult.error };
-    }
+    // 월별 usage와 billing을 병렬로 조회
+    const [usageResult, billingResult] = await Promise.all([
+      fetchUsageByDateRange(startDate, endDate),
+      fetchBillingFilesByMonth(month),
+    ]);
 
-    const billingResult = await fetchBillingFilesByMonth(month);
+    if (usageResult.error) {
+      return { month, error: usageResult.error };
+    }
     if (billingResult.error) {
-      return { data: [], error: billingResult.error };
+      return { month, error: billingResult.error };
     }
 
     const usageByCard = aggregateUsage(usageResult.data || []);
@@ -95,14 +98,32 @@ export async function getBillingComparison(monthCount: number): Promise<{ data: 
     }
 
     if (totalUsage > 0 || totalBilling > 0) {
-      result.push({
+      return {
         month,
-        usage_amount: totalUsage,
-        billing_amount: totalBilling,
-        cards: cards.sort((a, b) => b.usage_amount - a.usage_amount),
-      });
+        data: {
+          month,
+          usage_amount: totalUsage,
+          billing_amount: totalBilling,
+          cards: cards.sort((a, b) => b.usage_amount - a.usage_amount),
+        },
+      };
     }
+
+    return { month, data: null };
+  });
+
+  const results = await Promise.all(monthDataPromises);
+
+  // 에러 체크
+  const errorResult = results.find((r) => 'error' in r && r.error);
+  if (errorResult && 'error' in errorResult && errorResult.error) {
+    return { data: [], error: errorResult.error };
   }
 
-  return { data: result, error: null };
+  // 유효한 데이터만 필터링
+  const validData = results
+    .filter((r): r is { month: string; data: MonthlyBilling } => r.data !== null)
+    .map((r) => r.data);
+
+  return { data: validData, error: null };
 }
