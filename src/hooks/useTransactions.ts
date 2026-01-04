@@ -13,6 +13,7 @@ import type {
   CreateTransactionDto,
   Category,
 } from '@/types';
+import { clearTrendCache } from '@/lib/cache';
 import { getAdjacentMonth } from '@/lib/utils/date';
 
 /** 페이지네이션 정보 */
@@ -180,6 +181,7 @@ export function useUpdateTransaction() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      clearTrendCache(); // 추세 캐시 무효화
     },
   });
 }
@@ -193,6 +195,7 @@ export function useDeleteTransaction() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      clearTrendCache(); // 추세 캐시 무효화
     },
   });
 }
@@ -206,6 +209,7 @@ export function useCreateTransaction() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      clearTrendCache(); // 추세 캐시 무효화
     },
   });
 }

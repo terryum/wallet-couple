@@ -4,11 +4,12 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Category, Owner, TransactionType } from '@/types';
 import { mapSummaryToAggregation } from '@/lib/dashboard/transform';
 import { getAdjacentMonth, getRecentMonths as getRecentMonthsUtil, getCurrentYearMonth } from '@/lib/utils/date';
+import { getCachedTrendData, setCachedTrendData } from '@/lib/cache';
 
 /** 월별 카테고리 집계 */
 interface CategoryAggregation {
@@ -198,10 +199,10 @@ export interface CombinedMonthData {
   isExtended?: boolean; // 확장 데이터 여부 (손익선 연장용)
 }
 
-/** 소득+지출 여러 월 집계 훅 (점진적 로딩 버전)
- * - 요청된 monthCount만큼 데이터 로드 (빠른 초기 로딩)
- * - 캐시 키: ['dashboard', 'trend', monthCount, owner, transactionType]
- * - selectedMonth는 클라이언트 슬라이싱에만 사용 (IncomeExpenseBarCard에서 처리)
+/** 소득+지출 여러 월 집계 훅 (stale-while-revalidate 패턴)
+ * - 캐시된 데이터가 있으면 즉시 표시 (빈 화면 방지)
+ * - 백그라운드에서 최신 데이터 로드 후 업데이트
+ * - 새 데이터 로드 완료 시 캐시 갱신
  */
 export function useMultiMonthBothAggregation(
   monthCount: number,
@@ -209,18 +210,34 @@ export function useMultiMonthBothAggregation(
   _endMonth?: string,           // 하위 호환성 유지 (실제로는 사용하지 않음)
   _includeExtended?: boolean    // 하위 호환성 유지
 ) {
+  // 캐시된 데이터로 초기화 (SSR 방지)
+  const [cachedData, setCachedData] = useState<CombinedMonthData[]>([]);
+  const hasInitializedCache = useRef(false);
+
+  // 마운트 시 캐시 로드 (클라이언트 전용)
+  useEffect(() => {
+    if (hasInitializedCache.current || monthCount === 0) return;
+    hasInitializedCache.current = true;
+
+    const cached = getCachedTrendData(monthCount, owner);
+    if (cached && cached.length > 0) {
+      setCachedData(cached);
+    }
+  }, [monthCount, owner]);
+
   // 요청된 monthCount만큼 로드 (점진적 로딩)
   const incomeQuery = useMultiMonthAggregation(monthCount, owner, 'income');
   const expenseQuery = useMultiMonthAggregation(monthCount, owner, 'expense');
 
-  const combinedData: CombinedMonthData[] = [];
+  // 서버 데이터를 CombinedMonthData로 변환
+  const freshData: CombinedMonthData[] = [];
 
   if (incomeQuery.data && expenseQuery.data) {
     for (let i = 0; i < incomeQuery.data.length; i++) {
       const incomeMonth = incomeQuery.data[i];
       const expenseMonth = expenseQuery.data[i];
 
-      combinedData.push({
+      freshData.push({
         month: `${parseInt(incomeMonth.month.slice(5))}월`,
         fullMonth: incomeMonth.month,
         income: incomeMonth.total,
@@ -228,14 +245,30 @@ export function useMultiMonthBothAggregation(
         balance: incomeMonth.total - (expenseMonth?.total || 0),
         incomeByCategory: incomeMonth.byCategory,
         expenseByCategory: expenseMonth?.byCategory || [],
-        isExtended: false, // 클라이언트에서 슬라이싱 후 결정
+        isExtended: false,
       });
     }
   }
 
+  // 새 데이터 로드 완료 시 캐시 업데이트
+  useEffect(() => {
+    if (freshData.length > 0 && monthCount > 0) {
+      setCachedTrendData(monthCount, owner, freshData);
+    }
+  // freshData 배열 내용 기반으로 의존성 체크
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [freshData.length, monthCount, owner]);
+
+  const isLoading = incomeQuery.isLoading || expenseQuery.isLoading;
+
+  // 우선순위: 서버 데이터 > 캐시 데이터
+  // 로딩 중이고 캐시가 있으면 캐시 반환 (빈 화면 방지)
+  const dataToReturn = freshData.length > 0 ? freshData : cachedData;
+
   return {
-    data: combinedData,
-    isLoading: incomeQuery.isLoading || expenseQuery.isLoading,
+    data: dataToReturn,
+    isLoading: isLoading && dataToReturn.length === 0, // 캐시가 있으면 로딩=false
+    isFresh: freshData.length > 0, // 서버 데이터 여부
   };
 }
 

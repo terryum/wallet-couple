@@ -15,6 +15,7 @@ import { PasswordDialog } from './PasswordDialog';
 import { UploadResultPopup } from './UploadResultPopup';
 import { getPasswordPattern, getSourceDisplayName } from '@/lib/upload/filePatterns';
 import { readUploadStream } from '@/lib/upload/streaming';
+import { clearTrendCache } from '@/lib/cache';
 
 interface FileUploaderProps {
   owner: Owner;
@@ -466,6 +467,7 @@ export const FileUploader = forwardRef<FileUploaderRef, FileUploaderProps>(
     queryClient.invalidateQueries({ queryKey: ['uploaded_files'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     queryClient.invalidateQueries({ queryKey: ['billing-comparison'] });
+    clearTrendCache(); // 추세 로컬 캐시 무효화
 
     // 결과 메시지 생성
     const totalProcessedFiles = successFileCount + duplicateFileCount;
