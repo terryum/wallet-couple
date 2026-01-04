@@ -129,10 +129,9 @@ export function DataPrefetcher() {
     // 1단계: 가계분석 탭 데이터 즉시 프리페칭 (최우선)
     // - 현재 월 도넛차트용 (소득+지출 통합)
     prefetchTransactions(selectedMonth, 'all', true);
-    // - 막대차트용 추세 데이터 (26개월 = 24개월 + 확장 2개월)
-    // - 고정 캐시 키 사용 → 월 변경해도 캐시 히트
-    prefetchTrend(26, 'expense');
-    prefetchTrend(26, 'income');
+    // - 막대차트용 추세 데이터 (기본 3개월 표시용 = 5개월 로드)
+    prefetchTrend(5, 'expense');
+    prefetchTrend(5, 'income');
 
     // 2단계: 현재 월 소득/지출 + 이전 1개월 가계분석 데이터
     setTimeout(() => {
@@ -148,7 +147,7 @@ export function DataPrefetcher() {
       prefetchMonthly(prev1Month, 'income');
     }, PREFETCH_DELAY.FAST);
 
-    // 3단계: 2개월 전 데이터 + 다음 월 데이터
+    // 3단계: 2개월 전 데이터 + 다음 월 데이터 + 6개월 추세 데이터
     setTimeout(() => {
       // 2개월 전 가계분석 도넛차트용
       prefetchTransactions(prev2Month, 'all', true);
@@ -159,7 +158,22 @@ export function DataPrefetcher() {
       prefetchTransactions(nextMonth, 'all', true);
       prefetchMonthly(nextMonth, 'expense');
       prefetchMonthly(nextMonth, 'income');
+      // 6개월 추세 데이터 (기간 변경 대비)
+      prefetchTrend(8, 'expense');
+      prefetchTrend(8, 'income');
     }, PREFETCH_DELAY.NORMAL);
+
+    // 4단계: 12개월 추세 데이터 (기간 변경 대비)
+    setTimeout(() => {
+      prefetchTrend(14, 'expense');
+      prefetchTrend(14, 'income');
+    }, PREFETCH_DELAY.SLOW);
+
+    // 5단계: 24개월 추세 데이터 (백그라운드)
+    setTimeout(() => {
+      prefetchTrend(26, 'expense');
+      prefetchTrend(26, 'income');
+    }, PREFETCH_DELAY.BACKGROUND);
 
     initialPrefetchDone.current = true;
   }, [selectedMonth, selectedOwner, queryClient]);

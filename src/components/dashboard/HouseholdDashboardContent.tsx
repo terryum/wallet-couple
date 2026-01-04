@@ -24,8 +24,8 @@ export function HouseholdDashboardContent() {
   // 전역 상태
   const { selectedMonth, selectedOwner, currentUser } = useAppContext();
 
-  // 기간 상태
-  const [period, setPeriod] = useState<string>('6');
+  // 기간 상태 (기본 3개월 - 빠른 초기 로딩)
+  const [period, setPeriod] = useState<string>('3');
 
   const editFlow = useTransactionEditFlow({
     owner: currentUser,
@@ -77,13 +77,19 @@ export function HouseholdDashboardContent() {
     };
   }, [allData]);
 
-  // 추세 데이터 - 26개월 전체 데이터를 1회 로드 (캐시 최적화)
-  // selectedMonth 기준 슬라이싱은 IncomeExpenseBarCard에서 클라이언트 사이드로 처리
+  // 추세 데이터 - 기간에 따라 필요한 데이터만 로드 (빠른 초기 로딩)
+  // 3개월 → 5개월 로드, 6개월 → 8개월 로드, 12개월 → 14개월 로드, 24개월 → 26개월 로드
+  const monthCountForPeriod = {
+    '3': 5,   // 3개월 + 확장 2개월
+    '6': 8,   // 6개월 + 확장 2개월
+    '12': 14, // 12개월 + 확장 2개월
+    '24': 26, // 24개월 + 확장 2개월
+  }[period] || 5;
+
   const { data: trendData, isLoading: isLoadingTrend } =
     useMultiMonthBothAggregation(
-      26,  // 고정: 24개월 + 확장 2개월
+      monthCountForPeriod,
       selectedOwner || undefined
-      // endMonth, includeExtended 파라미터는 더 이상 사용하지 않음 (캐시 최적화)
     );
 
   // 업로드 버튼 클릭

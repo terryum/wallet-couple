@@ -192,22 +192,20 @@ export interface CombinedMonthData {
   isExtended?: boolean; // 확장 데이터 여부 (손익선 연장용)
 }
 
-/** 소득+지출 여러 월 집계 훅 (캐시 최적화 버전)
- * - 항상 26개월 데이터를 로드하여 캐시 재사용률 극대화
+/** 소득+지출 여러 월 집계 훅 (점진적 로딩 버전)
+ * - 요청된 monthCount만큼 데이터 로드 (빠른 초기 로딩)
+ * - 캐시 키: ['dashboard', 'trend', monthCount, owner, transactionType]
  * - selectedMonth는 클라이언트 슬라이싱에만 사용 (IncomeExpenseBarCard에서 처리)
  */
 export function useMultiMonthBothAggregation(
   monthCount: number,
   owner?: Owner,
   _endMonth?: string,           // 하위 호환성 유지 (실제로는 사용하지 않음)
-  _includeExtended?: boolean    // 하위 호환성 유지 (항상 true로 동작)
+  _includeExtended?: boolean    // 하위 호환성 유지
 ) {
-  // 항상 26개월 데이터 로드 (24개월 + 확장 2개월)
-  // 캐시 키가 고정되어 월 변경 시에도 캐시 히트
-  const FIXED_MONTH_COUNT = 26;
-
-  const incomeQuery = useMultiMonthAggregation(FIXED_MONTH_COUNT, owner, 'income');
-  const expenseQuery = useMultiMonthAggregation(FIXED_MONTH_COUNT, owner, 'expense');
+  // 요청된 monthCount만큼 로드 (점진적 로딩)
+  const incomeQuery = useMultiMonthAggregation(monthCount, owner, 'income');
+  const expenseQuery = useMultiMonthAggregation(monthCount, owner, 'expense');
 
   const combinedData: CombinedMonthData[] = [];
 
