@@ -20,8 +20,8 @@ export interface CategoryAggregation {
 export function mapSummaryToAggregation(summary?: SummaryPayload) {
   const byCategory = (summary?.byCategory || []).map((item) => ({
     category: item.category,
-    total_amount: item.total,
-    count: item.count,
+    total_amount: item.total ?? 0,
+    count: item.count ?? 0,
   }));
 
   const totalCount = byCategory.reduce((sum, item) => sum + item.count, 0);

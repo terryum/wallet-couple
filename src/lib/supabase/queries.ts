@@ -245,7 +245,7 @@ export async function getMonthlyAggregation(
         if (!acc[cat]) {
           acc[cat] = { total: 0, count: 0 };
         }
-        acc[cat].total += item.amount;
+        acc[cat].total += (item.amount ?? 0);
         acc[cat].count += 1;
         return acc;
       },
@@ -305,7 +305,7 @@ export async function getMonthlyTotal(
       return { data: null, error: error.message };
     }
 
-    const total = (data || []).reduce((sum, item) => sum + item.amount, 0);
+    const total = (data || []).reduce((sum, item) => sum + (item.amount ?? 0), 0);
 
     return { data: total, error: null };
   } catch (err) {

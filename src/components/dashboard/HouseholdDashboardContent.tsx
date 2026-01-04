@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { DualPieChartCard } from './DualPieChartCard';
 import { IncomeExpenseBarCard } from './IncomeExpenseBarCard';
@@ -14,10 +14,9 @@ import { SharedHeader, SharedBottomNav } from '@/components/layout';
 import { FileUploader, EditModal, type FileUploaderRef } from '@/components/transactions';
 import { useAppContext } from '@/contexts/AppContext';
 import { useTransactionEditFlow } from '@/hooks/useTransactionEditFlow';
-import {
-  useMonthlyBothAggregation,
-  useMultiMonthBothAggregation,
-} from '@/hooks/useDashboard';
+import { useTransactions } from '@/hooks/useTransactions';
+import { useMultiMonthBothAggregation } from '@/hooks/useDashboard';
+import type { Transaction, Category } from '@/types';
 
 export function HouseholdDashboardContent() {
   const fileUploaderRef = useRef<FileUploaderRef>(null);
@@ -34,9 +33,49 @@ export function HouseholdDashboardContent() {
     modalIdBase: 'household-dashboard',
   });
 
-  // 월별 소득+지출 데이터
-  const { income: incomeData, expense: expenseData, isLoading: isLoadingMonthly } =
-    useMonthlyBothAggregation(selectedMonth, selectedOwner || undefined);
+  // 월별 소득+지출 데이터 - 소득/지출 탭과 동일한 데이터 소스 사용
+  const { data: allData, isLoading: isLoadingMonthly } = useTransactions({
+    month: selectedMonth,
+    owner: selectedOwner || undefined,
+    includeSummary: true,
+    transactionType: 'all',
+  });
+
+  // 클라이언트에서 income/expense 분리 및 카테고리별 집계
+  const { incomeData, incomeTotal, expenseData, expenseTotal } = useMemo(() => {
+    const transactions = allData?.data || [];
+
+    const incomeTransactions = transactions.filter(
+      (tx) => tx.transaction_type === 'income'
+    );
+    const expenseTransactions = transactions.filter(
+      (tx) => tx.transaction_type !== 'income'
+    );
+
+    // 카테고리별 집계 함수
+    const aggregateByCategory = (txs: Transaction[]) => {
+      const map = new Map<string, { total: number; count: number }>();
+      txs.forEach((tx) => {
+        const existing = map.get(tx.category) || { total: 0, count: 0 };
+        map.set(tx.category, {
+          total: existing.total + tx.amount,
+          count: existing.count + 1,
+        });
+      });
+      return Array.from(map.entries()).map(([category, stats]) => ({
+        category: category as Category,
+        total_amount: stats.total,
+        count: stats.count,
+      }));
+    };
+
+    return {
+      incomeData: aggregateByCategory(incomeTransactions),
+      incomeTotal: incomeTransactions.reduce((sum, tx) => sum + tx.amount, 0),
+      expenseData: aggregateByCategory(expenseTransactions),
+      expenseTotal: expenseTransactions.reduce((sum, tx) => sum + tx.amount, 0),
+    };
+  }, [allData]);
 
   // 추세 데이터 (최대 24개월 - 직접입력 지원, 손익선 확장 포함)
   const maxPeriod = Math.max(parseInt(period) || 6, 12);
@@ -65,10 +104,10 @@ export function HouseholdDashboardContent() {
         <div className="max-w-lg mx-auto space-y-6">
           {/* 듀얼 도넛 차트: 소득/지출 비중 */}
           <DualPieChartCard
-            incomeData={incomeData.data}
-            incomeTotal={incomeData.total}
-            expenseData={expenseData.data}
-            expenseTotal={expenseData.total}
+            incomeData={incomeData}
+            incomeTotal={incomeTotal}
+            expenseData={expenseData}
+            expenseTotal={expenseTotal}
             month={selectedMonth}
             isLoading={isLoadingMonthly}
           />

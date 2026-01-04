@@ -26,7 +26,8 @@ export function formatCurrency(amount: number): string {
  * @returns 포맷된 문자열 (예: 123만원, 1,234만원)
  */
 export function formatManwon(amount: number): string {
-  const manwon = Math.round(amount / 10000);
+  const safeAmount = Number.isFinite(amount) ? amount : 0;
+  const manwon = Math.round(safeAmount / 10000);
   return `${formatNumber(manwon)}만원`;
 }
 

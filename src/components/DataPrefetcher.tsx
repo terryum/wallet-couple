@@ -89,14 +89,27 @@ export function DataPrefetcher() {
       });
     };
 
-    const prefetchTransactions = (month: string, transactionType: 'expense' | 'income') => {
+    const prefetchTransactions = (
+      month: string,
+      transactionType: 'expense' | 'income' | 'all',
+      includeSummary: boolean = false
+    ) => {
       const params = new URLSearchParams();
       params.set('month', month);
       params.set('transaction_type', transactionType);
       if (owner) params.set('owner', owner);
+      if (includeSummary) params.set('include_summary', 'true');
+
+      // 캐시 키를 useTransactions 훅과 동일하게 구성
+      const queryParams = {
+        month,
+        transactionType,
+        owner,
+        ...(includeSummary && { includeSummary: true }),
+      };
 
       queryClient.prefetchQuery({
-        queryKey: ['transactions', { month, transactionType, owner }],
+        queryKey: ['transactions', queryParams],
         queryFn: async () => {
           const res = await fetch(`/api/transactions?${params.toString()}`);
           if (!res.ok) throw new Error('Failed to fetch');
@@ -106,46 +119,52 @@ export function DataPrefetcher() {
       });
     };
 
-    // 1단계: 현재 월 지출 데이터 즉시 프리페칭 (가장 높은 우선순위)
-    prefetchMonthly(selectedMonth, 'expense');
-    prefetchTransactions(selectedMonth, 'expense');
+    const extendedEndMonth = getAdjacentMonth(selectedMonth, 1);
+    const prev1Month = getAdjacentMonth(selectedMonth, -1);
+    const prev2Month = getAdjacentMonth(selectedMonth, -2);
+    const nextMonth = getAdjacentMonth(selectedMonth, 1);
 
-    // 2단계: 현재 월 소득 데이터 (약간의 지연 후)
+    // 1단계: 가계분석 탭 데이터 즉시 프리페칭 (최우선)
+    // - 현재 월 도넛차트용 (소득+지출 통합)
+    prefetchTransactions(selectedMonth, 'all', true);
+    // - 막대차트용 추세 데이터 (14개월 = 12 + 확장 2개월)
+    prefetchTrend(14, 'expense', extendedEndMonth);
+    prefetchTrend(14, 'income', extendedEndMonth);
+
+    // 2단계: 현재 월 소득/지출 + 이전 1개월 가계분석 데이터
     setTimeout(() => {
+      // 현재 월 소득/지출
+      prefetchMonthly(selectedMonth, 'expense');
       prefetchMonthly(selectedMonth, 'income');
+      prefetchTransactions(selectedMonth, 'expense');
       prefetchTransactions(selectedMonth, 'income');
+      // 이전 1개월 가계분석 도넛차트용
+      prefetchTransactions(prev1Month, 'all', true);
+      // 이전 1개월 가계분석 막대차트용 (월별 집계)
+      prefetchMonthly(prev1Month, 'expense');
+      prefetchMonthly(prev1Month, 'income');
     }, PREFETCH_DELAY.FAST);
 
-    // 3단계: 이전 2개월 데이터 (백그라운드)
+    // 3단계: 기간 변경 대비 추세 데이터 (8개월, 16개월)
     setTimeout(() => {
-      const prevMonths = [
-        getAdjacentMonth(selectedMonth, -1),
-        getAdjacentMonth(selectedMonth, -2),
-      ];
-
-      prevMonths.forEach((month) => {
-        prefetchMonthly(month, 'expense');
-        prefetchMonthly(month, 'income');
-      });
-    }, PREFETCH_DELAY.NORMAL);
-
-    // 4단계: 가계분석 탭용 추세 데이터 (손익선 확장 포함: 8개월)
-    setTimeout(() => {
-      const extendedEndMonth = getAdjacentMonth(selectedMonth, 1);
       prefetchTrend(8, 'expense', extendedEndMonth);
       prefetchTrend(8, 'income', extendedEndMonth);
+      prefetchTrend(16, 'expense', extendedEndMonth);
+      prefetchTrend(16, 'income', extendedEndMonth);
+    }, PREFETCH_DELAY.NORMAL);
 
-      // 12개월 추세도 프리페칭
-      prefetchTrend(14, 'expense', extendedEndMonth);
-      prefetchTrend(14, 'income', extendedEndMonth);
-    }, PREFETCH_DELAY.SLOW);
-
-    // 5단계: 다음 월 데이터도 프리페칭 (월 이동 대비)
+    // 4단계: 2개월 전 데이터 + 다음 월 데이터
     setTimeout(() => {
-      const nextMonth = getAdjacentMonth(selectedMonth, 1);
+      // 2개월 전 가계분석 도넛차트용
+      prefetchTransactions(prev2Month, 'all', true);
+      // 2개월 전 소득/지출
+      prefetchMonthly(prev2Month, 'expense');
+      prefetchMonthly(prev2Month, 'income');
+      // 다음 월 데이터
+      prefetchTransactions(nextMonth, 'all', true);
       prefetchMonthly(nextMonth, 'expense');
       prefetchMonthly(nextMonth, 'income');
-    }, PREFETCH_DELAY.BACKGROUND);
+    }, PREFETCH_DELAY.SLOW);
 
     initialPrefetchDone.current = true;
   }, [selectedMonth, selectedOwner, queryClient]);
