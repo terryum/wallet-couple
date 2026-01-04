@@ -22,6 +22,7 @@
 | **앱 레벨 프리페칭** | DataPrefetcher로 초기 로딩 최적화 |
 | **유틸리티 모듈화** | math.ts, date.ts로 중복 제거 |
 | **queryKey 팩토리** | queryKeys.ts로 일관성 확보 |
+| **추세 캐싱** | stale-while-revalidate 패턴으로 빈 화면 방지 |
 
 ### 지원 소스 타입
 
@@ -38,6 +39,70 @@
 ---
 
 ## 최근 작업 (2026-01-04)
+
+### 로딩 속도 최적화 ✅
+
+#### 1. 사용자 클릭 우선순위 버그 수정
+
+**문제:** 첫 화면 로드 후 다른 탭 클릭 시 반응이 매우 느림 (프리페칭과 네트워크 경쟁)
+
+**해결:**
+- `PrefetchManager.ts`: `notifyUserAction()`에서 진행 중인 fetch 즉시 취소
+- `useTransactions.ts`, `useDashboard.ts`: 사용자 요청에 `priority: 'high'` 추가
+- `DataPrefetcher.tsx`: 프리페칭에 `priority: 'low'` 추가
+
+#### 2. 서버 과부하 방지
+
+**문제:** 가계분석 탭에서 10+ 동시 API 요청으로 Supabase 과부하 (응답 2-6초)
+
+**해결:**
+- `DataPrefetcher.tsx`: 프리페칭 최소화 (이전 1개월만, 3초 후 시작)
+- `HouseholdDashboardContent.tsx`: 추세 데이터 점진적 로딩 (도넛차트 완료 후 500ms 대기)
+- `useDashboard.ts`: `monthCount=0`이면 쿼리 비활성화
+
+#### 3. billing-comparison API 병렬화
+
+**문제:** 12개월 × 2쿼리 = 24개 순차 DB 호출 (5.4초)
+
+**해결:** `Promise.all`로 병렬화 → **1.5초 (72% 개선)**
+
+**수정 파일:** `src/lib/services/billing.service.ts`
+
+#### 4. 추세 그래프 stale-while-revalidate 캐싱
+
+**문제:** 가계분석 탭 첫 로딩 시 추세 그래프 빈 화면이 오래 지속
+
+**해결:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  가계분석 탭 오픈                                              │
+│         ↓                                                   │
+│  1. localStorage에서 캐시된 추세 데이터 즉시 표시               │
+│         ↓ (빈 화면 없음!)                                     │
+│  2. 백그라운드에서 3개월 소득/지출 데이터 로드                   │
+│         ↓                                                   │
+│  3. 로딩 완료 시 그래프 자동 업데이트 + 캐시 갱신               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**신규 파일:**
+- `src/lib/cache/trendCache.ts`: localStorage 기반 캐시 유틸리티
+- `src/lib/cache/index.ts`: 모듈 export
+
+**수정 파일:**
+- `src/hooks/useDashboard.ts`: stale-while-revalidate 패턴 적용
+- `src/hooks/useTransactions.ts`: 데이터 변경 시 캐시 무효화
+- `src/components/transactions/FileUploader.tsx`: 업로드 시 캐시 무효화
+
+#### 성능 개선 결과
+
+| 지표 | 이전 | 현재 | 개선율 |
+|------|------|------|--------|
+| 탭별 API 응답 | 2-6초 | 0.4-0.5초 | ~85% |
+| billing-comparison | 5.4초 | 1.5초 | 72% |
+| 추세 그래프 빈 화면 | 3-5초 | 0초 (캐시) | 100% |
+
+---
 
 ### 클린 아키텍처 리팩토링 ✅
 
@@ -168,6 +233,17 @@ Providers
 │   └── AppProvider
 │       ├── DataPrefetcher (앱 레벨 프리페칭)
 │       └── {children}
+```
+
+### 캐싱 구조 (stale-while-revalidate)
+```
+useMultiMonthBothAggregation
+├── 마운트 시: localStorage에서 캐시 로드 → 즉시 반환
+├── 백그라운드: React Query로 서버 데이터 fetch
+└── 완료 시: 캐시 갱신 + UI 업데이트
+
+데이터 변경 시 (생성/수정/삭제/업로드):
+└── clearTrendCache() 호출 → 다음 방문 시 새 데이터 로드
 ```
 
 ### 가계분석 데이터 흐름

@@ -87,10 +87,12 @@ src/
 ├── hooks/                  # React Query 훅
 │   └── useDashboard.ts     # 대시보드 데이터 훅 + 프리페칭
 ├── lib/
+│   ├── cache/              # 로컬 캐시 (stale-while-revalidate)
 │   ├── classifier/         # AI 카테고리 분류
 │   ├── loaders/            # 카드사/은행 파서
 │   ├── ingestion/          # 데이터 정규화
 │   ├── customizations/     # 커스텀 설정 레지스트리
+│   ├── prefetch/           # 프리페칭 관리 (PrefetchManager)
 │   ├── services/           # 비즈니스 로직
 │   └── repositories/       # DB 접근 래퍼
 └── types/                  # 타입 정의

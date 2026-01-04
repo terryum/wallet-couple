@@ -115,10 +115,11 @@ src/lib/loaders/
 
 | 화면 | 경로 | 설명 |
 |------|------|------|
-| 지출내역 | `/` | 월별 지출 목록, 필터, 검색 |
+| 홈 | `/` | 가계분석으로 리다이렉트 |
+| 지출내역 | `/expense` | 월별 지출 목록, 필터, 검색 |
 | 소득내역 | `/income` | 월별 소득 목록 |
 | 지출분석 | `/dashboard` | 지출 분석, 차트 |
-| 가계분석 | `/household` | 소득/지출 통합 분석 |
+| 가계분석 | `/household` | 소득/지출 통합 분석 (기본 화면) |
 | 투자 | `/investment` | 투자 현황 (예정) |
 | 설정 | 드롭다운 | 매핑 관리, 파일 관리 |
 
@@ -134,6 +135,17 @@ src/lib/loaders/
 | `StackedBarCard` | 월별 지출 추이 |
 | `DualPieChartCard` | 소득/지출 듀얼 도넛차트 |
 | `IncomeExpenseBarCard` | 통합 추세 + 카테고리 분석 |
+| `DataPrefetcher` | 앱 레벨 프리페칭 |
+
+### 성능 최적화
+
+| 기능 | 설명 |
+|------|------|
+| 프리페칭 | 앱 로드 시 인접 월 데이터 미리 로드 |
+| 사용자 클릭 우선순위 | 클릭 시 진행 중인 프리페칭 즉시 취소 |
+| 추세 캐싱 | localStorage 기반 stale-while-revalidate |
+| API 병렬화 | billing-comparison 등 순차 호출 → 병렬화 |
+| 점진적 로딩 | 도넛차트 완료 후 추세 데이터 로드 |
 
 ---
 
@@ -213,4 +225,4 @@ portfolio (id, symbol, name, quantity, purchase_price, current_price,
 
 ---
 
-*마지막 업데이트: 2026-01-03*
+*마지막 업데이트: 2026-01-04*
