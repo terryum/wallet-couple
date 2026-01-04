@@ -11,51 +11,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '@/contexts/AppContext';
 import { getPrefetchManager } from '@/lib/prefetch';
-import { getAdjacentMonth, getRecentMonths, getCurrentYearMonth } from '@/lib/utils/date';
-
-/** 월별 집계 데이터 fetch 함수 (프리페칭용 - 낮은 우선순위) */
-async function fetchMonthlyAggregation(
-  month: string,
-  owner?: string,
-  transactionType: 'expense' | 'income' = 'expense',
-  signal?: AbortSignal
-) {
-  const params = new URLSearchParams();
-  params.set('month', month);
-  params.set('include_summary', 'true');
-  params.set('transaction_type', transactionType);
-  if (owner) params.set('owner', owner);
-
-  const res = await fetch(`/api/transactions?${params.toString()}`, {
-    signal,
-    priority: 'low' as RequestPriority,  // 프리페칭은 낮은 우선순위
-  });
-  if (!res.ok) {
-    throw new Error('데이터를 불러오는데 실패했습니다.');
-  }
-  return res.json();
-}
-
-/** 여러 월의 집계 데이터 fetch 함수 */
-async function fetchMultiMonthAggregation(
-  months: string[],
-  owner?: string,
-  transactionType: 'expense' | 'income' = 'expense',
-  signal?: AbortSignal
-) {
-  const results = await Promise.all(
-    months.map(async (month) => {
-      const data = await fetchMonthlyAggregation(month, owner, transactionType, signal);
-      return {
-        month,
-        total: data.summary?.total || 0,
-        totalCount: data.summary?.totalCount || 0,
-        byCategory: data.summary?.byCategory || [],
-      };
-    })
-  );
-  return results;
-}
+import { getAdjacentMonth } from '@/lib/utils/date';
 
 export function DataPrefetcher() {
   const queryClient = useQueryClient();
@@ -63,33 +19,7 @@ export function DataPrefetcher() {
   const lastContextRef = useRef({ month: '', owner: '', tab: '' });
   const manager = getPrefetchManager();
 
-  // 프리페칭 함수들
-  const prefetchMonthly = useCallback(
-    (month: string, transactionType: 'expense' | 'income') => {
-      const owner = selectedOwner || undefined;
-      queryClient.prefetchQuery({
-        queryKey: ['dashboard', 'monthly', month, owner, transactionType],
-        queryFn: ({ signal }) => fetchMonthlyAggregation(month, owner, transactionType, signal),
-        staleTime: 1000 * 60 * 5,
-      });
-    },
-    [queryClient, selectedOwner]
-  );
-
-  const prefetchTrend = useCallback(
-    (monthCount: number, transactionType: 'expense' | 'income') => {
-      const owner = selectedOwner || undefined;
-      const fixedEndMonth = getCurrentYearMonth();
-      const months = getRecentMonths(monthCount, fixedEndMonth);
-      queryClient.prefetchQuery({
-        queryKey: ['dashboard', 'trend', monthCount, owner, transactionType],
-        queryFn: ({ signal }) => fetchMultiMonthAggregation(months, owner, transactionType, signal),
-        staleTime: 1000 * 60 * 5,
-      });
-    },
-    [queryClient, selectedOwner]
-  );
-
+  // 인접 월 프리페칭 함수 (최소화)
   const prefetchTransactions = useCallback(
     (month: string, transactionType: 'expense' | 'income' | 'all', includeSummary = false) => {
       const owner = selectedOwner || undefined;
@@ -123,7 +53,6 @@ export function DataPrefetcher() {
   );
 
   useEffect(() => {
-    const owner = selectedOwner || undefined;
     const context = {
       month: selectedMonth,
       owner: selectedOwner || '',
@@ -140,102 +69,25 @@ export function DataPrefetcher() {
     manager.cancelScheduled();
 
     const prev1Month = getAdjacentMonth(selectedMonth, -1);
-    const prev2Month = getAdjacentMonth(selectedMonth, -2);
-    const nextMonth = getAdjacentMonth(selectedMonth, 1);
 
     // ==========================================
-    // 1단계: 현재 탭 핵심 데이터 (50ms 지연 - 사용자 네비게이션 우선)
+    // 최소한의 프리페칭만 수행 (서버 과부하 방지)
+    // - 인접 월 1개만 프리페칭
+    // - 3초 대기 후 시작 (사용자가 탭에 머무를 때만)
     // ==========================================
-    const phase1TimerId = setTimeout(() => {
-      // 사용자 액션으로 일시 중단된 경우 스킵
+    const prefetchTimerId = setTimeout(() => {
       if (manager.paused) return;
 
-      if (activeTab === 'household') {
-        // 가계분석 탭: 도넛차트 + 막대그래프
-        prefetchTransactions(selectedMonth, 'all', true);
-        prefetchTrend(5, 'expense');
-        prefetchTrend(5, 'income');
-      } else if (activeTab === 'expense') {
-        // 지출 탭
-        prefetchTransactions(selectedMonth, 'expense', true);
-        prefetchMonthly(selectedMonth, 'expense');
-      } else if (activeTab === 'income') {
-        // 소득 탭
-        prefetchTransactions(selectedMonth, 'income', true);
-        prefetchMonthly(selectedMonth, 'income');
-      }
-    }, 50);
-
-    // ==========================================
-    // 2단계: 인접 월 데이터 (idle - high priority)
-    // ==========================================
-    manager.scheduleIdlePrefetch(() => {
-      // 이전 1개월
+      // 이전 월만 프리페칭 (가장 자주 조회하는 데이터)
       prefetchTransactions(prev1Month, 'all', true);
-      prefetchMonthly(prev1Month, 'expense');
-      prefetchMonthly(prev1Month, 'income');
-
-      // 현재 월 소득/지출 (가계분석 탭이 아닌 경우 보완)
-      if (activeTab !== 'expense') {
-        prefetchTransactions(selectedMonth, 'expense', true);
-        prefetchMonthly(selectedMonth, 'expense');
-      }
-      if (activeTab !== 'income') {
-        prefetchTransactions(selectedMonth, 'income', true);
-        prefetchMonthly(selectedMonth, 'income');
-      }
-    }, 'high');
-
-    // ==========================================
-    // 3단계: 확장 데이터 (idle - low priority)
-    // ==========================================
-    manager.scheduleIdlePrefetch(() => {
-      // 2개월 전, 다음 월
-      prefetchTransactions(prev2Month, 'all', true);
-      prefetchMonthly(prev2Month, 'expense');
-      prefetchMonthly(prev2Month, 'income');
-
-      prefetchTransactions(nextMonth, 'all', true);
-      prefetchMonthly(nextMonth, 'expense');
-      prefetchMonthly(nextMonth, 'income');
-
-      // 8개월 추세 (6개월 기간 선택 대비)
-      prefetchTrend(8, 'expense');
-      prefetchTrend(8, 'income');
-    }, 'low');
-
-    // ==========================================
-    // 4단계: 장기 추세 데이터 (idle - low priority)
-    // ==========================================
-    manager.scheduleIdlePrefetch(() => {
-      // 14개월 추세 (12개월 기간 선택 대비)
-      prefetchTrend(14, 'expense');
-      prefetchTrend(14, 'income');
-    }, 'low');
-
-    // ==========================================
-    // 5단계: 최장기 추세 데이터 (idle - low priority)
-    // ==========================================
-    manager.scheduleIdlePrefetch(() => {
-      // 26개월 추세 (24개월 기간 선택 대비)
-      prefetchTrend(26, 'expense');
-      prefetchTrend(26, 'income');
-    }, 'low');
+    }, 3000); // 3초 후 시작
 
     // cleanup
     return () => {
-      clearTimeout(phase1TimerId);
+      clearTimeout(prefetchTimerId);
       manager.cancelScheduled();
     };
-  }, [
-    selectedMonth,
-    selectedOwner,
-    activeTab,
-    manager,
-    prefetchMonthly,
-    prefetchTrend,
-    prefetchTransactions,
-  ]);
+  }, [selectedMonth, selectedOwner, activeTab, manager, prefetchTransactions]);
 
   // UI를 렌더링하지 않음
   return null;

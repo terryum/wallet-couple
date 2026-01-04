@@ -99,8 +99,19 @@ export function HouseholdDashboardContent() {
     };
   }, [allData]);
 
-  // 추세 데이터 - 기간에 따라 필요한 데이터만 로드 (빠른 초기 로딩)
-  // 3개월 → 5개월 로드, 6개월 → 8개월 로드, 12개월 → 14개월 로드, 24개월 → 26개월 로드
+  // 추세 데이터 로딩 지연 - 도넛차트 완료 후 로드 (서버 과부하 방지)
+  const [trendEnabled, setTrendEnabled] = useState(false);
+
+  useEffect(() => {
+    // 도넛차트 로딩 완료 후 500ms 대기 후 추세 데이터 로드
+    if (!isLoadingMonthly) {
+      const timer = setTimeout(() => setTrendEnabled(true), 500);
+      return () => clearTimeout(timer);
+    }
+    setTrendEnabled(false);
+  }, [isLoadingMonthly, selectedMonth]);
+
+  // 추세 데이터 - 기간에 따라 필요한 데이터만 로드
   const monthCountForPeriod = {
     '3': 5,   // 3개월 + 확장 2개월
     '6': 8,   // 6개월 + 확장 2개월
@@ -110,7 +121,7 @@ export function HouseholdDashboardContent() {
 
   const { data: trendData, isLoading: isLoadingTrend } =
     useMultiMonthBothAggregation(
-      monthCountForPeriod,
+      trendEnabled ? monthCountForPeriod : 0, // enabled가 false면 0개월 요청
       selectedOwner || undefined
     );
 

@@ -144,6 +144,7 @@ export function useMultiMonthAggregation(
     queryKey: ['dashboard', 'trend', monthCount, owner, transactionType],
     queryFn: ({ signal }) => fetchMultiMonthAggregation(months, owner, transactionType, signal),
     staleTime: 1000 * 60 * 5,
+    enabled: monthCount > 0, // monthCount가 0이면 쿼리 비활성화
   });
 }
 
