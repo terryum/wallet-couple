@@ -1,6 +1,6 @@
 # Current_Status.md
 
-마지막 업데이트: 2026-01-04
+마지막 업데이트: 2026-01-09
 
 ## 현재 구현 상태
 
@@ -14,7 +14,7 @@
 | 일괄 수정 | 비슷한 거래 일괄 카테고리 변경 |
 | 대시보드 | 월별 지출/소득 분석, 차트 |
 | PWA | 홈 화면 설치, 오프라인 캐싱 |
-| 매핑 관리 | 카테고리/이용처 매핑 확인 및 수정 |
+| 매핑 관리 | 카테고리/이용처 매핑 확인, 수정, **삭제 시 복구** |
 | **5탭 네비게이션** | 지출 \| 소득 \| 분석 \| 가계 \| 투자 |
 | **공통 컴포넌트** | TransactionPageContent, DashboardPageContent |
 | **디자인 시스템** | 토스 스타일 블루 기반 색상 시스템 |
@@ -38,7 +38,55 @@
 
 ---
 
-## 최근 작업 (2026-01-04)
+## 최근 작업 (2026-01-09)
+
+### 패턴 매핑 관리 개선 ✅
+
+#### 1. UI 개선
+- **필터 제거:** "전체/지출/소득" 필터 삭제 (불필요)
+- **최신순 정렬:** `created_at` 기준으로 최근 매핑이 위에 표시
+- **날짜/시간 표시:** "N회 적용" 대신 `01.09 14:30` 형식으로 저장 시간 표시
+
+#### 2. 매핑 상세 화면
+- **화살표 표현:** 변경 내용을 `패턴 → 카테고리` 형태로 명확히 표시
+- 카드 형태의 시각적 디자인 적용
+
+#### 3. 히스토리 추적 (신규)
+- **action_history.mapping_id:** 매핑과 트랜잭션 연결
+- **action_type: 'mapping_apply':** 매핑 적용 시 영향받은 트랜잭션 기록
+- 매핑 상세에서 "변경 히스토리" 조회 가능
+
+#### 4. 매핑 삭제 시 복구 기능 (신규)
+```
+매핑 삭제 요청
+    ↓
+action_history에서 mapping_id로 히스토리 조회
+    ↓
+previous_data 기반 원래 값으로 트랜잭션 복구
+    ↓
+매핑 삭제 + 관련 히스토리 삭제
+    ↓
+"N건의 거래가 복구되었습니다" 알림
+```
+
+#### 5. 버그 수정
+- **useInfiniteTransactions:** 무한 스크롤 시 중복 ID 제거 (React key 경고 해결)
+
+#### 수정 파일
+- `src/components/settings/MappingsManagement.tsx` - UI 전면 개선
+- `src/app/api/transactions/bulk/route.ts` - 히스토리 저장 로직 추가
+- `src/app/api/mappings/route.ts` - 삭제 시 복구 기능
+- `src/app/api/mappings/history/route.ts` - 트랜잭션 히스토리 통합 조회
+- `src/lib/services/mappings.service.ts` - 복구 로직 구현
+- `src/hooks/useTransactions.ts` - 중복 ID 제거
+
+#### DB 마이그레이션
+- `action_history.mapping_id` 컬럼 추가
+- `action_type` 체크 제약에 `mapping_apply` 추가
+
+---
+
+## 이전 작업 (2026-01-04)
 
 ### 로딩 속도 최적화 ✅
 
