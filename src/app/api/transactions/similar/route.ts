@@ -15,6 +15,39 @@ interface SimilarResponse {
 }
 
 /**
+ * 두 문자열의 유사도 계산 (0~1, 높을수록 유사)
+ * 완전 일치 = 1, 전혀 다름 = 0
+ */
+function calculateSimilarity(str1: string, str2: string): number {
+  const s1 = str1.toLowerCase().trim();
+  const s2 = str2.toLowerCase().trim();
+
+  // 완전 일치
+  if (s1 === s2) return 1;
+
+  // 한쪽이 다른 쪽을 포함하는 경우
+  if (s1.includes(s2) || s2.includes(s1)) {
+    const longer = Math.max(s1.length, s2.length);
+    const shorter = Math.min(s1.length, s2.length);
+    return 0.5 + (shorter / longer) * 0.4; // 0.5 ~ 0.9
+  }
+
+  // 공통 단어 수 기반 유사도
+  const words1 = new Set(s1.split(/[\s\-_()（）\[\]\/]+/).filter(w => w.length >= 2));
+  const words2 = new Set(s2.split(/[\s\-_()（）\[\]\/]+/).filter(w => w.length >= 2));
+
+  let commonWords = 0;
+  for (const word of words1) {
+    if (words2.has(word)) commonWords++;
+  }
+
+  const totalWords = Math.max(words1.size, words2.size);
+  if (totalWords === 0) return 0;
+
+  return (commonWords / totalWords) * 0.4; // 0 ~ 0.4
+}
+
+/**
  * 가맹점명에서 핵심 키워드 하나만 추출
  * 첫 번째 의미있는 단어를 반환 (가장 중요한 식별자)
  */
@@ -103,9 +136,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
+    // 원본 merchant_name과의 유사도 순으로 정렬
+    const sortedData = (data || []).sort((a, b) => {
+      const simA = calculateSimilarity(a.merchant_name, merchantName);
+      const simB = calculateSimilarity(b.merchant_name, merchantName);
+      // 유사도 높은 순으로 (내림차순)
+      if (simB !== simA) return simB - simA;
+      // 유사도 같으면 날짜 최신순
+      return new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime();
+    });
+
     const response: SimilarResponse = {
       success: true,
-      data: data || [],
+      data: sortedData,
       pattern: keyword,
     };
 

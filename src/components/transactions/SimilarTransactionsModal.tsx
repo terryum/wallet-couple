@@ -5,8 +5,8 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { X, Check, Loader2, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { X, Check, Loader2, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -62,6 +62,7 @@ export function SimilarTransactionsModal({
   const [pattern, setPattern] = useState('');
   const [result, setResult] = useState<string | null>(null);
   const [saveMapping, setSaveMapping] = useState(true); // 패턴 저장 여부 (기본: 저장함)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set()); // 접힌 그룹
 
   // 변경 타입 결정
   const hasMerchantChange = !!newMerchantName;
@@ -143,6 +144,64 @@ export function SimilarTransactionsModal({
     } else {
       setSelectedIds(new Set(similarTransactions.map((t) => t.id)));
     }
+  };
+
+  // 거래를 merchant_name별로 그룹화
+  const groupedTransactions = useMemo(() => {
+    const groups = new Map<string, Transaction[]>();
+    for (const tx of similarTransactions) {
+      const key = tx.merchant_name;
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(tx);
+    }
+    // Map을 배열로 변환 (순서 유지)
+    return Array.from(groups.entries());
+  }, [similarTransactions]);
+
+  // 그룹 선택/해제
+  const toggleGroup = (merchantName: string) => {
+    const groupTxs = similarTransactions.filter(t => t.merchant_name === merchantName);
+    const groupIds = groupTxs.map(t => t.id);
+    const allSelected = groupIds.every(id => selectedIds.has(id));
+
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        // 전체 해제
+        groupIds.forEach(id => next.delete(id));
+      } else {
+        // 전체 선택
+        groupIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  // 그룹 접기/펼치기
+  const toggleCollapse = (merchantName: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(merchantName)) {
+        next.delete(merchantName);
+      } else {
+        next.add(merchantName);
+      }
+      return next;
+    });
+  };
+
+  // 그룹 제거 (그룹 내 모든 항목 제거)
+  const removeGroup = (merchantName: string) => {
+    setSimilarTransactions(prev => prev.filter(t => t.merchant_name !== merchantName));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      similarTransactions
+        .filter(t => t.merchant_name === merchantName)
+        .forEach(t => next.delete(t.id));
+      return next;
+    });
   };
 
   // 일괄 수정
@@ -260,48 +319,120 @@ export function SimilarTransactionsModal({
               </span>
             </div>
 
-            {/* 거래 목록 */}
+            {/* 그룹화된 거래 목록 */}
             <div className="flex-1 overflow-y-auto min-h-0 -mx-6 px-6">
-              <div className="space-y-1 py-2">
-                {similarTransactions.map((tx) => {
-                  const isSelected = selectedIds.has(tx.id);
+              <div className="space-y-2 py-2">
+                {groupedTransactions.map(([merchantName, transactions]) => {
+                  const groupIds = transactions.map(t => t.id);
+                  const selectedCount = groupIds.filter(id => selectedIds.has(id)).length;
+                  const allSelected = selectedCount === transactions.length;
+                  const someSelected = selectedCount > 0 && !allSelected;
+                  const isCollapsed = collapsedGroups.has(merchantName);
+
                   return (
-                    <div
-                      key={tx.id}
-                      className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
-                        isSelected ? 'bg-blue-50' : 'bg-slate-50'
-                      }`}
-                    >
-                      {/* 체크박스 */}
-                      <button
-                        onClick={() => toggleSelection(tx.id)}
-                        className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                          isSelected
-                            ? 'bg-[#3182F6] border-[#3182F6] text-white'
-                            : 'border-slate-300 hover:border-[#3182F6]'
+                    <div key={merchantName} className="rounded-lg overflow-hidden">
+                      {/* 그룹 헤더 */}
+                      <div
+                        className={`flex items-center gap-2 p-2 transition-colors ${
+                          allSelected ? 'bg-blue-100' : someSelected ? 'bg-blue-50' : 'bg-slate-100'
                         }`}
                       >
-                        {isSelected && <Check className="w-3 h-3" />}
-                      </button>
+                        {/* 그룹 체크박스 */}
+                        <button
+                          onClick={() => toggleGroup(merchantName)}
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                            allSelected
+                              ? 'bg-[#3182F6] border-[#3182F6] text-white'
+                              : someSelected
+                                ? 'bg-blue-200 border-[#3182F6]'
+                                : 'border-slate-300 hover:border-[#3182F6]'
+                          }`}
+                        >
+                          {(allSelected || someSelected) && <Check className="w-3 h-3" />}
+                        </button>
 
-                      {/* 거래 정보 */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">
-                          {tx.merchant_name}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {formatShortDate(tx.transaction_date)} · {formatCurrency(tx.amount)}
-                        </p>
+                        {/* 접기/펼치기 버튼 */}
+                        <button
+                          onClick={() => toggleCollapse(merchantName)}
+                          className="p-0.5 rounded hover:bg-slate-200 text-slate-500 shrink-0"
+                        >
+                          {isCollapsed ? (
+                            <ChevronRight className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
+                        </button>
+
+                        {/* 그룹 정보 */}
+                        <button
+                          onClick={() => toggleGroup(merchantName)}
+                          className="flex-1 min-w-0 text-left"
+                        >
+                          <span className="text-sm font-medium text-slate-900 truncate block">
+                            {merchantName}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {selectedCount}/{transactions.length}건 선택
+                          </span>
+                        </button>
+
+                        {/* 그룹 제거 버튼 */}
+                        <button
+                          onClick={() => removeGroup(merchantName)}
+                          className="p-1 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 shrink-0"
+                          aria-label={`그룹 제외: ${merchantName}`}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
 
-                      {/* 제거 버튼 */}
-                      <button
-                        onClick={() => removeItem(tx.id)}
-                        className="p-1 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 shrink-0"
-                        aria-label={`항목 제외: ${tx.merchant_name}`}
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {/* 그룹 내 개별 항목 (펼쳐진 경우) */}
+                      {!isCollapsed && (
+                        <div className="pl-8 space-y-0.5 bg-white">
+                          {transactions.map((tx) => {
+                            const isSelected = selectedIds.has(tx.id);
+                            return (
+                              <div
+                                key={tx.id}
+                                className={`flex items-center gap-2 p-1.5 rounded transition-colors ${
+                                  isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'
+                                }`}
+                              >
+                                {/* 체크박스 */}
+                                <button
+                                  onClick={() => toggleSelection(tx.id)}
+                                  className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                                    isSelected
+                                      ? 'bg-[#3182F6] border-[#3182F6] text-white'
+                                      : 'border-slate-300 hover:border-[#3182F6]'
+                                  }`}
+                                >
+                                  {isSelected && <Check className="w-2.5 h-2.5" />}
+                                </button>
+
+                                {/* 거래 정보 */}
+                                <div className="flex-1 min-w-0 flex items-center gap-2">
+                                  <span className="text-xs text-slate-500">
+                                    {formatShortDate(tx.transaction_date)}
+                                  </span>
+                                  <span className="text-xs text-slate-700">
+                                    {formatCurrency(tx.amount)}
+                                  </span>
+                                </div>
+
+                                {/* 제거 버튼 */}
+                                <button
+                                  onClick={() => removeItem(tx.id)}
+                                  className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 shrink-0"
+                                  aria-label={`항목 제외`}
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

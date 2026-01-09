@@ -30,8 +30,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatNumber, formatManwon } from '@/lib/utils/format';
 import { safeYAxisDomain } from '@/lib/utils/math';
 import { transaction } from '@/constants/colors';
-import { ALL_EXPENSE_CATEGORIES, INCOME_CATEGORIES, type Category } from '@/types';
+import { ALL_EXPENSE_CATEGORIES, INCOME_CATEGORIES, type Category, type TransactionType } from '@/types';
 import type { CombinedMonthData } from '@/hooks/useDashboard';
+import { CategoryPopup } from './CategoryPopup';
 
 // 카테고리 선택 타입: 전체 또는 개별 카테고리
 type CategorySelection =
@@ -69,6 +70,21 @@ export function IncomeExpenseBarCard({
   const [categorySelection, setCategorySelection] = useState<CategorySelection>({
     type: 'total',
     transactionType: 'expense',
+  });
+
+  // CategoryPopup 상태
+  const [popupState, setPopupState] = useState<{
+    isOpen: boolean;
+    month: string;
+    category: string | null;
+    transactionType: TransactionType;
+    amount: number;
+  }>({
+    isOpen: false,
+    month: '',
+    category: null,
+    transactionType: 'expense',
+    amount: 0,
   });
 
   // 외부에서 제어되면 외부 값 사용, 아니면 내부 상태 사용
@@ -430,12 +446,8 @@ export function IncomeExpenseBarCard({
 
           {/* 선택된 월 소득/지출 */}
           {selectedMonthData && (() => {
-            // 이전 월 데이터 찾기
-            const currentIndex = data.findIndex((d) => d.fullMonth === displayMonth);
-            const prevMonthData = currentIndex > 0 ? data[currentIndex - 1] : null;
-            const balanceDiff = prevMonthData
-              ? selectedMonthData.balance - prevMonthData.balance
-              : null;
+            // 당월 손익 (소득 - 지출)
+            const currentBalance = selectedMonthData.income - selectedMonthData.expense;
 
             return (
               <div className="mt-3 pt-3 border-t border-slate-100 px-2">
@@ -448,9 +460,9 @@ export function IncomeExpenseBarCard({
                     <span style={{ color: transaction.expense }}>
                       지출 {formatManwon(selectedMonthData.expense)}
                     </span>
-                    {balanceDiff !== null && balanceDiff !== 0 && (
+                    {currentBalance !== 0 && (
                       <span className="text-[10px] text-slate-400">
-                        ({balanceDiff > 0 ? '+' : ''}{formatManwon(balanceDiff)})
+                        ({currentBalance > 0 ? '+' : ''}{formatManwon(currentBalance)})
                       </span>
                     )}
                   </div>
@@ -581,13 +593,43 @@ export function IncomeExpenseBarCard({
                   tickFormatter={(v) => `${(v / 10000).toFixed(0)}`}
                 />
                 <Tooltip
-                  formatter={(value) => [formatNumber(value as number) + '원', getCategorySelectionLabel()]}
-                  labelFormatter={(label) => `${label}`}
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #E2E8F0',
-                    borderRadius: '8px',
-                    fontSize: '12px',
+                  wrapperStyle={{ pointerEvents: 'auto' }}
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload || payload.length === 0) return null;
+                    const amount = payload[0].value as number;
+                    const monthData = categoryChartData.find(d => d.month === label);
+                    const fullMonth = monthData?.fullMonth || '';
+
+                    // 현재 선택된 카테고리 정보
+                    const currentCategory = categorySelection.type === 'category'
+                      ? categorySelection.category
+                      : '전체';
+                    const currentTransactionType = categorySelection.transactionType;
+
+                    return (
+                      <div
+                        className="bg-white border border-slate-200 rounded-lg p-2 shadow-lg"
+                        style={{ fontSize: '12px' }}
+                      >
+                        <p className="text-slate-500 mb-1">{label}</p>
+                        <button
+                          onClick={() => {
+                            setPopupState({
+                              isOpen: true,
+                              month: fullMonth,
+                              category: currentCategory,
+                              transactionType: currentTransactionType,
+                              amount,
+                            });
+                          }}
+                          className="text-left hover:bg-slate-50 rounded px-1 -mx-1 transition-colors"
+                          style={{ color: getCategorySelectionColor() }}
+                        >
+                          <span className="font-medium">{getCategorySelectionLabel()}</span>
+                          <span className="ml-1">: {formatNumber(amount)}원</span>
+                        </button>
+                      </div>
+                    );
                   }}
                 />
                 <Bar
@@ -609,6 +651,16 @@ export function IncomeExpenseBarCard({
           </div>
         </div>
       </CardContent>
+
+      {/* 카테고리 상세 팝업 */}
+      <CategoryPopup
+        isOpen={popupState.isOpen}
+        onClose={() => setPopupState(prev => ({ ...prev, isOpen: false }))}
+        category={popupState.category}
+        month={popupState.month}
+        totalAmount={popupState.amount}
+        transactionType={popupState.transactionType}
+      />
     </Card>
   );
 }

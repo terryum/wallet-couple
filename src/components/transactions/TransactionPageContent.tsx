@@ -191,7 +191,8 @@ export function TransactionPageContent({
 
   // 모달이 닫히고 데이터가 갱신된 후 스크롤 위치 복원
   useEffect(() => {
-    if (editFlow.editModalOpen || savedScrollPositionRef.current === null) {
+    // 모달(EditModal 또는 SimilarTransactionsModal)이 열려있으면 복원하지 않음
+    if (editFlow.isSubModalOpen || savedScrollPositionRef.current === null) {
       return;
     }
 
@@ -200,10 +201,10 @@ export function TransactionPageContent({
         window.scrollTo({ top: savedScrollPositionRef.current, behavior: 'instant' });
         savedScrollPositionRef.current = null;
       }
-    }, 100);
+    }, 150); // 데이터 갱신 후 DOM 업데이트 대기
 
     return () => clearTimeout(timeoutId);
-  }, [editFlow.editModalOpen, transactions]);
+  }, [editFlow.isSubModalOpen, transactions]);
 
   // 행 클릭 (편집)
   const handleLongPress = (transaction: Transaction) => {
