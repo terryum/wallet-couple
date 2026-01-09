@@ -158,6 +158,11 @@ export function SimilarTransactionsModal({
       // 카테고리 변경
       if (hasCategoryChange && newCategory) {
         body.category = newCategory;
+        // 카테고리 매핑 저장 (체크박스 상태에 따라)
+        if (saveMapping) {
+          body.save_category_mapping = true;
+          body.original_merchant = originalTransaction?.merchant_name;
+        }
       }
 
       // 이용처명 변경

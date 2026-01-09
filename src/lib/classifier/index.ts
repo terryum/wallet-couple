@@ -584,21 +584,28 @@ export async function classifyIncomeTransactions(
   return results;
 }
 
+/** saveManualMapping 반환 타입 */
+export interface SaveMappingResult {
+  id: string | null;
+  error: string | null;
+}
+
 /**
  * 수동 카테고리 변경 시 매핑 저장/업데이트
  * 사용자가 직접 수정한 카테고리는 우선순위가 높음
+ * @returns 저장된 매핑의 ID와 에러 정보
  */
 export async function saveManualMapping(
   merchantName: string,
   category: Category
-): Promise<void> {
+): Promise<SaveMappingResult> {
   const pattern = extractPattern(merchantName);
 
   console.log(`[수동 매핑] ${merchantName} → ${pattern} → ${category}`);
 
   try {
-    // manual 소스로 저장 (AI보다 우선)
-    await supabase
+    // manual 소스로 저장 (AI보다 우선) + ID 반환
+    const { data, error } = await supabase
       .from('category_mappings')
       .upsert(
         {
@@ -610,10 +617,19 @@ export async function saveManualMapping(
         {
           onConflict: 'pattern',
         }
-      );
+      )
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('수동 매핑 저장 실패:', error);
+      return { id: null, error: error.message };
+    }
+
+    return { id: data?.id || null, error: null };
   } catch (error) {
     console.error('수동 매핑 저장 실패:', error);
-    throw error;
+    return { id: null, error: String(error) };
   }
 }
 

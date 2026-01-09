@@ -33,6 +33,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
       category,
       merchant_name,
       save_mapping,
+      save_category_mapping,
       original_merchant,
     } = body;
 
@@ -109,21 +110,19 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // 4. 카테고리 매핑 저장 시 매핑 ID 조회
-    if (category && original_merchant) {
+    // 4. 카테고리 매핑 저장 (save_category_mapping 플래그가 있을 때)
+    if (save_category_mapping && category && original_merchant) {
       try {
-        const pattern = extractPattern(original_merchant);
-        const { data: catMappingData } = await supabase
-          .from('category_mappings')
-          .select('id')
-          .eq('pattern', pattern)
-          .single();
-
-        if (catMappingData) {
-          mappingId = catMappingData.id;
+        const { saveManualMapping } = await import('@/lib/classifier');
+        const result = await saveManualMapping(original_merchant, category);
+        if (result.id) {
+          mappingId = result.id;
+          console.log(`[카테고리 매핑 저장] ${original_merchant} → ${category}, ID: ${result.id}`);
+        } else if (result.error) {
+          console.error('[카테고리 매핑 저장 실패]', result.error);
         }
-      } catch {
-        // 매핑이 없을 수 있음
+      } catch (mappingError) {
+        console.error('카테고리 매핑 저장 예외:', mappingError);
       }
     }
 
