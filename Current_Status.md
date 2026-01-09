@@ -40,7 +40,72 @@
 
 ## 최근 작업 (2026-01-09)
 
-### 패턴 매핑 관리 개선 ✅
+### 패턴 매핑 관리 2차 개선 ✅
+
+#### 1. 컴포넌트 분리 (849줄 → 432줄)
+
+**문제:** `MappingsManagement.tsx`가 849줄로 가이드라인(250줄) 초과
+
+**해결:**
+| 새 파일 | 내용 | 줄수 |
+|---------|------|------|
+| `MappingDetailPopup.tsx` | 매핑 상세 팝업 + 히스토리 + 복구 | ~240줄 |
+| `MappingListItem.tsx` | 카테고리/이용처 매핑 목록 아이템 | ~105줄 |
+| `MappingFilters.tsx` | 소유자 필터 + 검색 | ~55줄 |
+
+#### 2. 히스토리 저장 버그 수정
+
+**문제:** 유사 항목 일괄 수정 시 변경 히스토리가 저장되지 않음
+- `saveManualMapping()`이 `void` 반환 → 매핑 ID 없음
+- bulk API에서 `mappingId` 없으면 히스토리 생성 안됨
+
+**해결:**
+```typescript
+// src/lib/classifier/index.ts
+export interface SaveMappingResult {
+  id: string | null;
+  error: string | null;
+}
+
+export async function saveManualMapping(
+  merchantName: string,
+  category: Category
+): Promise<SaveMappingResult> {
+  // upsert 후 .select('id').single()로 ID 반환
+}
+```
+
+```typescript
+// src/components/transactions/SimilarTransactionsModal.tsx
+if (hasCategoryChange && newCategory) {
+  body.category = newCategory;
+  if (saveMapping) {
+    body.save_category_mapping = true;  // 신규 플래그
+    body.original_merchant = originalTransaction?.merchant_name;
+  }
+}
+```
+
+#### 3. 소유자 필터 통합
+
+**문제:** 이용처명 탭에 소유자 필터(전체/남편/아내)가 없음
+
+**해결:**
+- `ownerFilter`를 카테고리/이용처 탭 모두에 적용
+- 필터 UI를 `activeTab !== 'upload'` 조건으로 표시
+
+#### 수정 파일
+- `src/lib/classifier/index.ts` - saveManualMapping 반환값 수정
+- `src/components/transactions/SimilarTransactionsModal.tsx` - save_category_mapping 플래그 추가
+- `src/app/api/transactions/bulk/route.ts` - 카테고리 매핑 저장 및 ID 획득 로직
+- `src/components/settings/MappingsManagement.tsx` - 리팩토링 (849→432줄)
+- `src/components/settings/MappingDetailPopup.tsx` - 신규 (분리)
+- `src/components/settings/MappingListItem.tsx` - 신규 (분리)
+- `src/components/settings/MappingFilters.tsx` - 신규 (분리)
+
+---
+
+### 패턴 매핑 관리 1차 개선 ✅
 
 #### 1. UI 개선
 - **필터 제거:** "전체/지출/소득" 필터 삭제 (불필요)
