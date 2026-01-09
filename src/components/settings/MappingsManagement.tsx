@@ -120,61 +120,67 @@ function MappingDetailPopup({
           </div>
         </div>
 
-        {/* 매핑 정보 */}
+        {/* 매핑 정보 - 화살표로 변경 표현 */}
         <div className="p-4 border-b border-slate-100">
           {isCategoryMapping ? (
             <div className="space-y-3">
-              <div>
-                <span className="text-xs text-slate-400">패턴</span>
-                <p className="text-sm font-medium text-slate-900">{categoryMapping.pattern}</p>
+              {/* 패턴 → 카테고리 (화살표 표현) */}
+              <div className="p-4 bg-slate-50 rounded-xl">
+                <div className="flex items-center justify-center gap-3">
+                  <div className="flex-1 text-center">
+                    <span className="text-xs text-slate-400 block mb-1">패턴</span>
+                    <p className="text-sm font-bold text-slate-900">{categoryMapping.pattern}</p>
+                  </div>
+                  <div className="flex flex-col items-center px-2">
+                    <span className="text-2xl text-[#3182F6]">→</span>
+                  </div>
+                  <div className="flex-1 text-center">
+                    <span className="text-xs text-slate-400 block mb-1">카테고리</span>
+                    <Badge className={`${CATEGORY_COLORS[categoryMapping.category] || CATEGORY_COLORS['기타']} text-sm`}>
+                      {categoryMapping.category}
+                    </Badge>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">카테고리</span>
-                <Badge className={`${CATEGORY_COLORS[categoryMapping.category] || CATEGORY_COLORS['기타']} text-xs`}>
-                  {categoryMapping.category}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-4 text-xs text-slate-500">
+              <div className="flex items-center justify-between text-xs text-slate-500">
                 <span>
-                  {categoryMapping.source === 'manual'
-                    ? categoryMapping.owner === 'husband'
-                      ? '남편'
-                      : categoryMapping.owner === 'wife'
-                      ? '아내'
-                      : '수동 설정'
-                    : 'AI 분류'}
+                  {categoryMapping.owner === 'husband' ? '남편' : categoryMapping.owner === 'wife' ? '아내' : '공통'}
                 </span>
-                <span>{categoryMapping.match_count}회 적용</span>
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>{formatDateTime(mapping.created_at)}</span>
+                </div>
               </div>
             </div>
           ) : (
             <div className="space-y-3">
-              <div>
-                <span className="text-xs text-slate-400">원본 패턴</span>
-                <p className="text-sm font-medium text-slate-900">{merchantMapping.original_pattern}</p>
+              {/* 원본 → 변환 (화살표 표현) */}
+              <div className="p-4 bg-slate-50 rounded-xl">
+                <div className="flex items-center justify-center gap-3">
+                  <div className="flex-1 text-center">
+                    <span className="text-xs text-slate-400 block mb-1">원본</span>
+                    <p className="text-sm font-bold text-slate-900">{merchantMapping.original_pattern}</p>
+                  </div>
+                  <div className="flex flex-col items-center px-2">
+                    <span className="text-2xl text-[#3182F6]">→</span>
+                  </div>
+                  <div className="flex-1 text-center">
+                    <span className="text-xs text-slate-400 block mb-1">변환</span>
+                    <p className="text-sm font-bold text-[#3182F6]">{merchantMapping.preferred_name}</p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <span className="text-xs text-slate-400">변환 이름</span>
-                <p className="text-sm font-medium text-[#3182F6]">{merchantMapping.preferred_name}</p>
-              </div>
-              <div className="flex items-center gap-4 text-xs text-slate-500">
+              <div className="flex items-center justify-between text-xs text-slate-500">
                 <span>
-                  {merchantMapping.owner === 'husband'
-                    ? '남편'
-                    : merchantMapping.owner === 'wife'
-                    ? '아내'
-                    : '수동 설정'}
+                  {merchantMapping.owner === 'husband' ? '남편' : merchantMapping.owner === 'wife' ? '아내' : '공통'}
                 </span>
-                <span>{merchantMapping.match_count}회 적용</span>
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>{formatDateTime(mapping.created_at)}</span>
+                </div>
               </div>
             </div>
           )}
-
-          {/* 생성 시간 */}
-          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs text-slate-400">
-            <Clock className="w-3.5 h-3.5" />
-            <span>매핑 생성: {formatDateTime(mapping.created_at)}</span>
-          </div>
         </div>
 
         {/* 변경 히스토리 */}
@@ -277,8 +283,6 @@ function MappingDetailPopup({
 
 // 소유자 필터 타입
 type OwnerFilter = 'all' | 'husband' | 'wife';
-// 거래 유형 필터 타입
-type TransactionTypeFilter = 'all' | 'expense' | 'income';
 
 export function MappingsManagement() {
   const queryClient = useQueryClient();
@@ -291,7 +295,6 @@ export function MappingsManagement() {
 
   // 필터 상태
   const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>('all');
-  const [transactionTypeFilter, setTransactionTypeFilter] = useState<TransactionTypeFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   // 삭제 중 상태
@@ -424,8 +427,12 @@ export function MappingsManagement() {
     }
   }, []);
 
-  // 매핑 삭제
+  // 매핑 삭제 (영향받은 트랜잭션 복구 포함)
   const handleDelete = async (type: TabType, id: string) => {
+    if (!confirm('매핑을 삭제하시겠습니까?\n\n이 매핑으로 변경된 거래들이 원래 값으로 복구됩니다.')) {
+      return;
+    }
+
     try {
       setDeletingId(id);
       const res = await fetch(`/api/mappings?type=${type}&id=${id}`, {
@@ -441,9 +448,19 @@ export function MappingsManagement() {
         }
         // 팝업 닫기
         setSelectedMapping(null);
+        // 복구된 건수 표시
+        if (data.restored > 0) {
+          alert(`${data.restored}건의 거래가 복구되었습니다.`);
+        }
+        // 거래 캐시 무효화
+        queryClient.invalidateQueries({ queryKey: ['transactions'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      } else {
+        alert(`삭제 실패: ${data.error}`);
       }
     } catch (err) {
       console.error('삭제 실패:', err);
+      alert('삭제 중 오류가 발생했습니다.');
     } finally {
       setDeletingId(null);
     }
@@ -513,26 +530,30 @@ export function MappingsManagement() {
   }
 
   // 사용자가 직접 저장한 패턴만 필터링 (AI 분류 패턴 제외)
-  // + 검색어 필터링
-  const manualCategoryMappings = categoryMappings.filter((m) => {
-    if (m.source !== 'manual') return false;
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      m.pattern.toLowerCase().includes(query) ||
-      m.category.toLowerCase().includes(query)
-    );
-  });
+  // + 검색어 필터링 + 최신순 정렬
+  const manualCategoryMappings = categoryMappings
+    .filter((m) => {
+      if (m.source !== 'manual') return false;
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        m.pattern.toLowerCase().includes(query) ||
+        m.category.toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  // 이용처명 매핑 검색 필터링
-  const filteredMerchantMappings = merchantMappings.filter((m) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      m.original_pattern.toLowerCase().includes(query) ||
-      m.preferred_name.toLowerCase().includes(query)
-    );
-  });
+  // 이용처명 매핑 검색 필터링 + 최신순 정렬
+  const filteredMerchantMappings = merchantMappings
+    .filter((m) => {
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        m.original_pattern.toLowerCase().includes(query) ||
+        m.preferred_name.toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const currentMappings = activeTab === 'category' ? manualCategoryMappings : filteredMerchantMappings;
 
@@ -599,24 +620,6 @@ export function MappingsManagement() {
               </div>
             )}
 
-            {/* 거래 유형 필터 - 카테고리 탭에서만 */}
-            {activeTab === 'category' && (
-              <div className="flex gap-1">
-                {(['all', 'expense', 'income'] as const).map((filter) => (
-                  <button
-                    key={filter}
-                    onClick={() => setTransactionTypeFilter(filter)}
-                    className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
-                      transactionTypeFilter === filter
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                    }`}
-                  >
-                    {filter === 'all' ? '전체' : filter === 'expense' ? '지출' : '소득'}
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* 검색창 */}
             <div className="flex-1 flex justify-end">
@@ -688,22 +691,23 @@ export function MappingsManagement() {
                 className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors"
                 onClick={() => handleMappingClick(mapping)}
               >
-                {/* 패턴 */}
+                {/* 패턴 → 카테고리 */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">
-                    {mapping.pattern}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {mapping.owner === 'husband' ? '남편' : mapping.owner === 'wife' ? '아내' : ''} · {mapping.match_count}회 적용
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium text-slate-900 truncate">
+                      {mapping.pattern}
+                    </span>
+                    <span className="text-slate-400">→</span>
+                    <Badge
+                      className={`${CATEGORY_COLORS[mapping.category] || CATEGORY_COLORS['기타']} text-xs shrink-0`}
+                    >
+                      {mapping.category}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {mapping.owner === 'husband' ? '남편 · ' : mapping.owner === 'wife' ? '아내 · ' : ''}{formatDateTime(mapping.created_at)}
                   </p>
                 </div>
-
-                {/* 카테고리 뱃지 */}
-                <Badge
-                  className={`${CATEGORY_COLORS[mapping.category] || CATEGORY_COLORS['기타']} text-xs`}
-                >
-                  {mapping.category}
-                </Badge>
 
                 {/* 삭제 버튼 */}
                 <button
@@ -730,23 +734,21 @@ export function MappingsManagement() {
                 className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors"
                 onClick={() => handleMappingClick(mapping)}
               >
-                {/* 원본 패턴 */}
+                {/* 원본 → 변환 */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">
-                    {mapping.original_pattern}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {mapping.owner === 'husband' ? '남편' : mapping.owner === 'wife' ? '아내' : ''} · {mapping.match_count}회 적용
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium text-slate-900 truncate">
+                      {mapping.original_pattern}
+                    </span>
+                    <span className="text-slate-400">→</span>
+                    <span className="text-sm font-medium text-[#3182F6] truncate">
+                      {mapping.preferred_name}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {mapping.owner === 'husband' ? '남편 · ' : mapping.owner === 'wife' ? '아내 · ' : ''}{formatDateTime(mapping.created_at)}
                   </p>
                 </div>
-
-                {/* 화살표 */}
-                <span className="text-slate-400 text-sm">→</span>
-
-                {/* 변환된 이름 */}
-                <span className="text-sm font-medium text-[#3182F6]">
-                  {mapping.preferred_name}
-                </span>
 
                 {/* 삭제 버튼 */}
                 <button

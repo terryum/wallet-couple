@@ -254,8 +254,22 @@ export function useInfiniteTransactions(
     enabled,
   });
 
-  // 모든 페이지의 거래 내역을 하나의 배열로 합치기
-  const allTransactions = query.data?.pages.flatMap((page) => page.data) ?? [];
+  // 모든 페이지의 거래 내역을 하나의 배열로 합치기 (중복 제거)
+  const allTransactions = (() => {
+    const pages = query.data?.pages ?? [];
+    const seen = new Set<string>();
+    const result: Transaction[] = [];
+
+    for (const page of pages) {
+      for (const tx of page.data) {
+        if (!seen.has(tx.id)) {
+          seen.add(tx.id);
+          result.push(tx);
+        }
+      }
+    }
+    return result;
+  })();
 
   // 첫 번째 페이지의 summary 사용
   const summary = query.data?.pages[0]?.summary ?? null;

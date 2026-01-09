@@ -107,13 +107,85 @@ export async function updateMerchantMappingWithHistory(
 
 export async function deleteMappingByType(
   type: 'category' | 'merchant',
-  id: string
-): Promise<{ error: string | null }> {
+  id: string,
+  restoreTransactions: boolean = true
+): Promise<{ error: string | null; restored: number }> {
+  // 1. 삭제 전에 이 매핑으로 인해 영향받은 트랜잭션들을 복구
+  let restoredCount = 0;
+  if (restoreTransactions) {
+    const restoreResult = await restoreTransactionsFromMapping(id);
+    if (restoreResult.error) {
+      console.error('트랜잭션 복구 실패:', restoreResult.error);
+    } else {
+      restoredCount = restoreResult.restored;
+    }
+  }
+
+  // 2. 매핑 삭제
   const result = await deleteMapping(type, id);
   if (result.error) {
-    return { error: result.error };
+    return { error: result.error, restored: restoredCount };
   }
-  return { error: null };
+
+  // 3. 관련 히스토리 삭제
+  const { supabase } = await import('@/lib/supabase/client');
+  await supabase.from('action_history').delete().eq('mapping_id', id);
+
+  return { error: null, restored: restoredCount };
+}
+
+/**
+ * 특정 매핑으로 인해 변경된 트랜잭션들을 원래 값으로 복구
+ */
+export async function restoreTransactionsFromMapping(
+  mappingId: string
+): Promise<{ error: string | null; restored: number }> {
+  const { supabase } = await import('@/lib/supabase/client');
+
+  // 1. 이 매핑으로 인해 영향받은 히스토리 조회
+  const { data: histories, error: historyError } = await supabase
+    .from('action_history')
+    .select('*')
+    .eq('action_type', 'mapping_apply')
+    .eq('mapping_id', mappingId);
+
+  if (historyError) {
+    return { error: historyError.message, restored: 0 };
+  }
+
+  if (!histories || histories.length === 0) {
+    return { error: null, restored: 0 };
+  }
+
+  // 2. 각 트랜잭션을 이전 값으로 복구
+  let restoredCount = 0;
+  for (const history of histories) {
+    if (history.entity_id && history.previous_data) {
+      const prevData = history.previous_data as Record<string, unknown>;
+      const updateData: Record<string, unknown> = {};
+
+      if (prevData.category) {
+        updateData.category = prevData.category;
+      }
+      if (prevData.merchant_name) {
+        updateData.merchant_name = prevData.merchant_name;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        const { error: updateError } = await supabase
+          .from('transactions')
+          .update(updateData)
+          .eq('id', history.entity_id);
+
+        if (!updateError) {
+          restoredCount++;
+        }
+      }
+    }
+  }
+
+  console.log(`[매핑 삭제 복구] ${restoredCount}건의 트랜잭션 복구 완료`);
+  return { error: null, restored: restoredCount };
 }
 
 export async function fetchMappingHistoryById(mappingId: string) {

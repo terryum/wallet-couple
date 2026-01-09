@@ -162,13 +162,14 @@ interface DeleteMappingRequest {
 
 /**
  * DELETE /api/mappings
- * 매핑 삭제
+ * 매핑 삭제 (영향받은 트랜잭션 복구 포함)
  */
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') as 'category' | 'merchant' | null;
     const id = searchParams.get('id');
+    const restore = searchParams.get('restore') !== 'false'; // 기본값 true
 
     if (!type || !id) {
       return NextResponse.json(
@@ -177,7 +178,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const result = await deleteMappingByType(type, id);
+    const result = await deleteMappingByType(type, id, restore);
     if (result.error) {
       return NextResponse.json(
         { success: false, error: result.error },
@@ -187,7 +188,10 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({
       success: true,
-      message: '매핑이 삭제되었습니다.',
+      message: result.restored > 0
+        ? `매핑이 삭제되고 ${result.restored}건의 거래가 복구되었습니다.`
+        : '매핑이 삭제되었습니다.',
+      restored: result.restored,
     });
   } catch (err) {
     return NextResponse.json(
