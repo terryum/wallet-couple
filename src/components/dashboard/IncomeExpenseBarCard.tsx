@@ -31,9 +31,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatNumber, formatManwon } from '@/lib/utils/format';
 import { safeYAxisDomain } from '@/lib/utils/math';
 import { transaction } from '@/constants/colors';
-import { ALL_EXPENSE_CATEGORIES, INCOME_CATEGORIES, type Category, type TransactionType } from '@/types';
+import { ALL_EXPENSE_CATEGORIES, INCOME_CATEGORIES, type Category, type TransactionType, type Owner } from '@/types';
 import type { CombinedMonthData } from '@/hooks/useDashboard';
 import { CategoryPopup } from './CategoryPopup';
+import { InsightText } from './InsightText';
+import { useTrendInsight } from '@/hooks/useHouseholdInsights';
 
 // 카테고리 선택 타입: 전체 또는 개별 카테고리
 type CategorySelection =
@@ -47,6 +49,7 @@ interface IncomeExpenseBarCardProps {
   onMonthClick?: (month: string) => void;
   period?: string;
   onPeriodChange?: (period: string) => void;
+  owner?: Owner;
 }
 
 type PresetPeriod = '3' | '6' | '12';
@@ -58,6 +61,7 @@ export function IncomeExpenseBarCard({
   onMonthClick,
   period: externalPeriod,
   onPeriodChange,
+  owner,
 }: IncomeExpenseBarCardProps) {
   const [internalPeriod, setInternalPeriod] = useState<string>('6');
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -154,6 +158,14 @@ export function IncomeExpenseBarCard({
       isExtended: i === 0 || i === sliced.length - 1,
     }));
   }, [displayData, period, headerMonth]);
+
+  // AI 인사이트 훅
+  const { insight, isLoading: insightLoading } = useTrendInsight({
+    period,
+    owner,
+    trendData: filteredData,
+    enabled: !isLoading && filteredData.length > 0,
+  });
 
   // 소득/지출 분석용 차트 데이터 (지출을 음수로)
   const mainChartData = useMemo(() => {
@@ -363,6 +375,7 @@ export function IncomeExpenseBarCard({
             )}
           </div>
         </div>
+        <InsightText insight={insight} isLoading={insightLoading} className="mt-2" />
       </CardHeader>
 
       <CardContent className="px-2 space-y-6">

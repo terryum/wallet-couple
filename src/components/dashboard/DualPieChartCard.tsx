@@ -13,9 +13,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatNumber, formatYearMonth, formatManwon } from '@/lib/utils/format';
 import { safePercentage } from '@/lib/utils/math';
 import { CategoryPopup } from './CategoryPopup';
+import { InsightText } from './InsightText';
 import { getCategoryColor } from '@/constants/chart';
 import { transaction } from '@/constants/colors';
-import type { Category, TransactionType } from '@/types';
+import { usePieInsight } from '@/hooks/useHouseholdInsights';
+import type { Category, TransactionType, Owner } from '@/types';
 
 interface CategoryData {
   category: Category;
@@ -31,6 +33,13 @@ interface DualPieChartCardProps {
   month: string;
   isLoading?: boolean;
   onCategoryClick?: (category: string, type: TransactionType) => void;
+  owner?: Owner;
+  previousAvg?: {
+    incomeTotal: number;
+    expenseTotal: number;
+    incomeByCategory: CategoryData[];
+    expenseByCategory: CategoryData[];
+  };
 }
 
 interface ChartEntry {
@@ -66,6 +75,8 @@ export function DualPieChartCard({
   month,
   isLoading,
   onCategoryClick,
+  owner,
+  previousAvg,
 }: DualPieChartCardProps) {
   const [popupCategory, setPopupCategory] = useState<string | null>(null);
   const [popupType, setPopupType] = useState<TransactionType>('expense');
@@ -74,6 +85,18 @@ export function DualPieChartCard({
 
   const incomeChartData = prepareChartData(incomeData, incomeTotal);
   const expenseChartData = prepareChartData(expenseData, expenseTotal);
+
+  // AI 인사이트 훅
+  const { insight, isLoading: insightLoading } = usePieInsight({
+    month,
+    owner,
+    incomeData,
+    incomeTotal,
+    expenseData,
+    expenseTotal,
+    previousAvg,
+    enabled: !isLoading && (incomeTotal > 0 || expenseTotal > 0),
+  });
 
   // NaN 방지: 값이 유효하지 않으면 0으로 처리
   const safeIncomeTotal = Number.isFinite(incomeTotal) ? incomeTotal : 0;
@@ -169,6 +192,7 @@ export function DualPieChartCard({
               {balance >= 0 ? '+' : ''}{formatManwon(balance)}
             </span>
           </div>
+          <InsightText insight={insight} isLoading={insightLoading} className="mt-2" />
         </CardHeader>
         <CardContent className="px-1 pb-2">
           <div className="flex gap-0">

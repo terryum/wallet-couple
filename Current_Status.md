@@ -1,6 +1,6 @@
 # Current_Status.md
 
-마지막 업데이트: 2026-01-09
+마지막 업데이트: 2026-01-11
 
 ## 현재 구현 상태
 
@@ -23,6 +23,7 @@
 | **유틸리티 모듈화** | math.ts, date.ts로 중복 제거 |
 | **queryKey 팩토리** | queryKeys.ts로 일관성 확보 |
 | **추세 캐싱** | stale-while-revalidate 패턴으로 빈 화면 방지 |
+| **AI 인사이트** | 가계분석 차트 AI 요약 (Claude API) |
 
 ### 지원 소스 타입
 
@@ -38,7 +39,54 @@
 
 ---
 
-## 최근 작업 (2026-01-09)
+## 최근 작업 (2026-01-11)
+
+### 가계분석 AI 인사이트 기능 ✅
+
+#### 1. AI 요약 생성 (`/api/insights/household`)
+
+**Pie 차트 (소득/지출 비중):**
+- 소득: 최대 1줄 (특징만 간단히)
+- 지출: 최대 4줄 (카테고리별 분석)
+- 고정비(양육비, 전세이자, 관리비) 제외
+
+**Trend 차트 (소득/지출 추세):**
+- 누적 손익 + 손익율(%) 표시 (예: "5개월간 약 1337만원(24%) 흑자")
+- 지출 증가/감소 추세 카테고리 언급
+- 최대 4줄
+
+#### 2. 세션 기반 캐싱
+
+```
+새로고침/새 접속 시:
+├── sessionStorage 초기화 → 새 세션 시작
+├── 기존 localStorage 캐시 무효화
+└── AI 인사이트 새로 생성
+
+탭 이동 시:
+├── sessionStorage 유지 → 같은 세션
+└── 현재 세션에서 저장한 캐시 사용
+```
+
+#### 3. UI 개선
+
+- **아이콘 크기 축소:** `w-3 h-3` → `w-2.5 h-2.5` (더 많은 글자 한 줄에)
+- **더보기/접기:** 두 줄 초과 시 토글 버튼 표시
+
+#### 신규 파일
+- `src/app/api/insights/household/route.ts` - AI 인사이트 API
+- `src/components/dashboard/InsightText.tsx` - AI 요약 표시 컴포넌트
+- `src/hooks/useHouseholdInsights.ts` - 인사이트 데이터 훅
+- `src/lib/cache/insightCache.ts` - 세션 기반 캐시
+
+#### 수정 파일
+- `src/components/dashboard/DualPieChartCard.tsx` - InsightText 통합
+- `src/components/dashboard/IncomeExpenseBarCard.tsx` - InsightText 통합
+- `src/lib/cache/index.ts` - insightCache export 추가
+
+---
+
+## 이전 작업 (2026-01-09)
 
 ### 패턴 매핑 관리 2차 개선 ✅
 
