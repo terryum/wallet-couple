@@ -12,6 +12,7 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 import {
   ComposedChart,
   BarChart,
@@ -91,6 +92,17 @@ export function IncomeExpenseBarCard({
   const period = externalPeriod || internalPeriod;
   const setPeriod = onPeriodChange || setInternalPeriod;
 
+  // 이전 데이터 캐싱 (로딩 중 빈 화면 방지)
+  const previousDataRef = useRef<CombinedMonthData[]>([]);
+  useEffect(() => {
+    if (data && data.length > 0 && !isLoading) {
+      previousDataRef.current = data;
+    }
+  }, [data, isLoading]);
+
+  // 로딩 중일 때 이전 데이터 사용
+  const displayData = (isLoading && previousDataRef.current.length > 0) ? previousDataRef.current : data;
+
   // 직접입력 모드가 활성화되면 입력창에 포커스
   useEffect(() => {
     if (showCustomInput && customInputRef.current) {
@@ -115,33 +127,33 @@ export function IncomeExpenseBarCard({
   // - 26개월 전체 데이터에서 headerMonth 기준 period개월만 추출
   // - 손익선 확장을 위해 전후 1개월씩 추가 (isExtended 표시)
   const filteredData = useMemo(() => {
-    if (!data || data.length === 0) return [];
+    if (!displayData || displayData.length === 0) return [];
 
     const count = parseInt(period) || 6;
 
     // headerMonth의 인덱스 찾기 (없으면 마지막 데이터 사용)
     const selectedIndex = headerMonth
-      ? data.findIndex((d) => d.fullMonth === headerMonth)
-      : data.length - 1;
+      ? displayData.findIndex((d) => d.fullMonth === headerMonth)
+      : displayData.length - 1;
 
     // 유효한 인덱스가 아니면 마지막 데이터 기준
-    const endIndex = selectedIndex >= 0 ? selectedIndex : data.length - 1;
+    const endIndex = selectedIndex >= 0 ? selectedIndex : displayData.length - 1;
 
     // 시작 인덱스 계산 (확장 1개월 포함)
     const startIndex = Math.max(0, endIndex - count - 1 + 1); // count개월 + 앞 1개월
 
     // 종료 인덱스 계산 (확장 1개월 포함)
-    const extendedEndIndex = Math.min(data.length - 1, endIndex + 1);
+    const extendedEndIndex = Math.min(displayData.length - 1, endIndex + 1);
 
     // 슬라이싱
-    const sliced = data.slice(startIndex, extendedEndIndex + 1);
+    const sliced = displayData.slice(startIndex, extendedEndIndex + 1);
 
     // isExtended 표시 (첫 번째와 마지막)
     return sliced.map((d, i) => ({
       ...d,
       isExtended: i === 0 || i === sliced.length - 1,
     }));
-  }, [data, period, headerMonth]);
+  }, [displayData, period, headerMonth]);
 
   // 소득/지출 분석용 차트 데이터 (지출을 음수로)
   const mainChartData = useMemo(() => {
@@ -247,7 +259,8 @@ export function IncomeExpenseBarCard({
       .reduce((sum, d) => sum + (d.amount || 0), 0);
   }, [categoryChartData]);
 
-  if (isLoading) {
+  // 이전 데이터도 없는 초기 로딩 상태
+  if (isLoading && previousDataRef.current.length === 0) {
     return (
       <Card className="rounded-2xl">
         <CardHeader className="pb-2">
@@ -276,7 +289,16 @@ export function IncomeExpenseBarCard({
   }
 
   return (
-    <Card className="rounded-2xl">
+    <Card className="rounded-2xl relative">
+      {/* 로딩 오버레이 (이전 데이터 위에 표시) */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-10 flex items-center justify-center rounded-2xl">
+          <div className="flex items-center gap-2 text-slate-500">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm">로딩 중...</span>
+          </div>
+        </div>
+      )}
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-medium">소득/지출 추세</CardTitle>

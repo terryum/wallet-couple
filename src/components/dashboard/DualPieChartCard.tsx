@@ -75,7 +75,13 @@ export function DualPieChartCard({
   const incomeChartData = prepareChartData(incomeData, incomeTotal);
   const expenseChartData = prepareChartData(expenseData, expenseTotal);
 
-  const balance = incomeTotal - expenseTotal;
+  // NaN 방지: 값이 유효하지 않으면 0으로 처리
+  const safeIncomeTotal = Number.isFinite(incomeTotal) ? incomeTotal : 0;
+  const safeExpenseTotal = Number.isFinite(expenseTotal) ? expenseTotal : 0;
+  const balance = safeIncomeTotal - safeExpenseTotal;
+
+  // 데이터가 아직 준비되지 않은 경우 (초기 로딩 상태)
+  const hasNoData = incomeData.length === 0 && expenseData.length === 0 && safeIncomeTotal === 0 && safeExpenseTotal === 0;
 
   const handleCategoryClick = (category: string, type: TransactionType) => {
     setPopupCategory(category);
@@ -131,7 +137,8 @@ export function DualPieChartCard({
     );
   };
 
-  if (isLoading) {
+  // 로딩 중이거나 데이터가 아직 없을 때 스켈레톤 표시
+  if (isLoading || hasNoData) {
     return (
       <Card className="rounded-2xl">
         <CardHeader className="pb-2">
@@ -207,7 +214,7 @@ export function DualPieChartCard({
                   >
                     <p className="text-[10px] text-emerald-600 font-medium">소득</p>
                     <p className="text-xs font-bold text-slate-900">
-                      {formatManwon(incomeTotal)}
+                      {formatManwon(safeIncomeTotal)}
                     </p>
                   </div>
                 )}
@@ -256,7 +263,7 @@ export function DualPieChartCard({
                   >
                     <p className="text-[10px] text-blue-600 font-medium">지출</p>
                     <p className="text-xs font-bold text-slate-900">
-                      {formatManwon(expenseTotal)}
+                      {formatManwon(safeExpenseTotal)}
                     </p>
                   </div>
                 )}
@@ -276,7 +283,7 @@ export function DualPieChartCard({
                 >
                   <span className="text-sm font-medium text-emerald-600">소득</span>
                   <div className="flex items-center gap-1">
-                    <span className="text-sm font-medium text-slate-900 tabular-nums">{formatManwon(incomeTotal)}</span>
+                    <span className="text-sm font-medium text-slate-900 tabular-nums">{formatManwon(safeIncomeTotal)}</span>
                     {incomeExpanded ? (
                       <ChevronUp className="w-3 h-3 text-emerald-500" />
                     ) : (
@@ -317,7 +324,7 @@ export function DualPieChartCard({
                 >
                   <span className="text-sm font-medium text-blue-600">지출</span>
                   <div className="flex items-center gap-1">
-                    <span className="text-sm font-medium text-slate-900 tabular-nums">{formatManwon(expenseTotal)}</span>
+                    <span className="text-sm font-medium text-slate-900 tabular-nums">{formatManwon(safeExpenseTotal)}</span>
                     {expenseExpanded ? (
                       <ChevronUp className="w-3 h-3 text-blue-500" />
                     ) : (
